@@ -435,6 +435,82 @@
 
     /* ── Hidden ── */
     .hidden { display: none !important; }
+
+    /* ── Auto-Trading Bot ── */
+    .bot-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .bot-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      color: #9ca3af;
+      cursor: pointer;
+      margin-left: auto;
+    }
+
+    .bot-toggle input[type=checkbox] {
+      accent-color: #2563eb;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    .bot-api-hint {
+      font-size: 0.75rem;
+      color: #4b5563;
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .bot-api-hint code {
+      background: #1f2437;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #93c5fd;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .bot-script {
+      width: 100%;
+      height: 180px;
+      background: #0f1117;
+      border: 1px solid #2e3348;
+      border-radius: 8px;
+      color: #e0e0e0;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.82rem;
+      padding: 10px;
+      resize: vertical;
+      outline: none;
+      line-height: 1.5;
+      tab-size: 2;
+      transition: border-color 0.2s;
+    }
+
+    .bot-script:focus { border-color: #2563eb; }
+
+    .bot-log {
+      margin-top: 8px;
+      max-height: 90px;
+      overflow-y: auto;
+      font-size: 0.75rem;
+      font-family: 'Courier New', Courier, monospace;
+      background: #0a0c12;
+      border: 1px solid #1f2437;
+      border-radius: 6px;
+      padding: 6px 10px;
+      color: #6b7280;
+    }
+
+    .bot-log::-webkit-scrollbar { width: 4px; }
+    .bot-log::-webkit-scrollbar-track { background: #0f1117; }
+    .bot-log::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -539,6 +615,26 @@
             </thead>
             <tbody id="marketTableBody"></tbody>
           </table>
+        </div>
+
+        <!-- Auto-Trading Bot -->
+        <div class="card" style="margin-top:20px;">
+          <div class="bot-header">
+            <h3 style="margin:0;">🤖 Auto-Trading Bot</h3>
+            <label class="bot-toggle">
+              <input type="checkbox" id="botEnabled" onchange="toggleBot(this.checked)" />
+              Enable
+            </label>
+            <button class="btn btn-secondary" style="padding:5px 12px; font-size:0.8rem;" onclick="runBotOnce()">▶ Run Once</button>
+          </div>
+          <p class="bot-api-hint">
+            Write JavaScript that executes each simulation day when enabled. Available variables and functions:<br>
+            <code>prices</code> · <code>holdings</code> · <code>cash</code> · <code>day</code> · <code>totalDays</code> ·
+            <code>buy(symbol, shares)</code> · <code>sell(symbol, shares)</code> · <code>priceHistory(symbol, n)</code><br>
+            <em>Note: <code>cash</code> is a snapshot at the start of each day's execution; <code>buy()</code> and <code>sell()</code> validate against the live balance.</em>
+          </p>
+          <textarea class="bot-script" id="botScript" spellcheck="false"></textarea>
+          <div class="bot-log hidden" id="botLog"></div>
         </div>
       </div>
 
@@ -738,6 +834,16 @@ function startSimulation() {
 
   document.getElementById('playPauseBtn').textContent = '▶ Play';
   document.getElementById('dayDisplay').textContent = `Day 0 / ${totalDays}`;
+
+  const botLogEl = document.getElementById('botLog');
+  botLogEl.innerHTML = '';
+  botLogEl.classList.add('hidden');
+
+  const botCheckbox = document.getElementById('botEnabled');
+  if (botCheckbox.checked) {
+    botCheckbox.checked = false;
+    botEnabled = false;
+  }
 }
 
 function resetSimulation() {
@@ -1179,6 +1285,7 @@ function tick() {
   }
   currentDay++;
   updateDay();
+  if (botEnabled) runTradingScript();
 }
 
 function stepForward() {
@@ -1188,6 +1295,7 @@ function stepForward() {
   }
   currentDay++;
   updateDay();
+  if (botEnabled) runTradingScript();
 }
 
 function updateDay() {
@@ -1220,6 +1328,147 @@ function showNotification(msg) {
   if (notifTimer) clearTimeout(notifTimer);
   notifTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
+
+// ──────────────────────────────────────────────
+// Auto-Trading Bot
+// ──────────────────────────────────────────────
+
+let botEnabled = false;
+
+const DEFAULT_BOT_SCRIPT =
+`// Simple Moving Average (SMA) strategy
+// Buys when the price dips 3% below its 10-day average (dip-buying).
+// Sells when the price rises 5% above its 10-day average (take profit).
+// Allocates up to 20% of available cash per buy signal.
+
+for (const symbol of Object.keys(prices)) {
+  const hist = priceHistory(symbol, 10);
+  if (hist.length < 10) continue; // need enough history
+
+  const avg = hist.reduce((a, b) => a + b, 0) / hist.length;
+  const price = prices[symbol];
+  const owned = holdings[symbol] ? holdings[symbol].shares : 0;
+
+  if (price < avg * 0.97 && cash >= price) {
+    // Price dipped 3% below MA — buy
+    const maxShares = Math.floor(cash * 0.2 / price);
+    if (maxShares > 0) buy(symbol, maxShares);
+  } else if (owned > 0 && price > avg * 1.05) {
+    // Price rose 5% above MA — sell all
+    sell(symbol, owned);
+  }
+}`;
+
+function toggleBot(enabled) {
+  botEnabled = enabled;
+}
+
+function runBotOnce() {
+  if (stocks.length === 0) { showNotification('Start a simulation first.'); return; }
+  runTradingScript();
+}
+
+/**
+ * Execute the user's trading script for the current day.
+ * Exposes a safe, scoped API via new Function() so the script cannot
+ * accidentally shadow or mutate simulator internals directly.
+ */
+function runTradingScript() {
+  const script = document.getElementById('botScript').value.trim();
+  if (!script) return;
+
+  // prices: read-only snapshot { SYMBOL: currentPrice }
+  const pricesMap = {};
+  stocks.forEach(s => { pricesMap[s.symbol] = s.prices[currentDay]; });
+
+  // holdings: read-only snapshot { SYMBOL: { shares, avgCost } }
+  const holdingsSnap = {};
+  Object.keys(holdings).forEach(sym => {
+    if (holdings[sym].shares > 0) {
+      holdingsSnap[sym] = {
+        shares: holdings[sym].shares,
+        avgCost: holdings[sym].totalCost / holdings[sym].shares
+      };
+    }
+  });
+
+  // priceHistory(symbol, n) — returns the last n closing prices, oldest first
+  const priceHistoryFn = (symbol, n) => {
+    const stock = stocks.find(s => s.symbol === symbol);
+    if (!stock) return [];
+    const start = Math.max(0, currentDay - n + 1);
+    return stock.prices.slice(start, currentDay + 1);
+  };
+
+  // buy(symbol, shares) — execute a market buy at today's price
+  const buyFn = (symbol, shares) => {
+    const stock = stocks.find(s => s.symbol === symbol);
+    if (!stock) { appendBotLog(`Unknown symbol: ${symbol}`); return; }
+    shares = Math.floor(shares);
+    if (!shares || shares <= 0) { appendBotLog(`Invalid shares for buy: ${shares}`); return; }
+    const price = stock.prices[currentDay];
+    const cost = shares * price;
+    if (cost > cash) {
+      appendBotLog(`Insufficient funds for ${symbol} (need $${cost.toFixed(2)}, have $${cash.toFixed(2)})`);
+      return;
+    }
+    cash -= cost;
+    if (!holdings[symbol]) holdings[symbol] = { shares: 0, totalCost: 0 };
+    holdings[symbol].shares += shares;
+    holdings[symbol].totalCost += cost;
+    transactions.unshift({ type: 'buy', symbol, shares, price, total: cost, day: currentDay });
+    appendBotLog(`🤖 BUY  ${shares}× ${symbol} @ $${price.toFixed(2)}`);
+    updatePortfolioUI();
+    updateTxLog();
+  };
+
+  // sell(symbol, shares) — execute a market sell at today's price
+  const sellFn = (symbol, shares) => {
+    const stock = stocks.find(s => s.symbol === symbol);
+    if (!stock) { appendBotLog(`Unknown symbol: ${symbol}`); return; }
+    shares = Math.floor(shares);
+    if (!shares || shares <= 0) { appendBotLog(`Invalid shares for sell: ${shares}`); return; }
+    if (!holdings[symbol] || holdings[symbol].shares < shares) {
+      appendBotLog(`Not enough shares of ${symbol} (own ${(holdings[symbol] || {}).shares || 0})`);
+      return;
+    }
+    const price = stock.prices[currentDay];
+    const proceeds = shares * price;
+    cash += proceeds;
+    holdings[symbol].shares -= shares;
+    const ratio = shares / (holdings[symbol].shares + shares);
+    holdings[symbol].totalCost *= (1 - ratio);
+    if (holdings[symbol].shares === 0) delete holdings[symbol];
+    transactions.unshift({ type: 'sell', symbol, shares, price, total: proceeds, day: currentDay });
+    appendBotLog(`🤖 SELL ${shares}× ${symbol} @ $${price.toFixed(2)}`);
+    updatePortfolioUI();
+    updateTxLog();
+  };
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(
+      'prices', 'holdings', 'cash', 'day', 'totalDays', 'buy', 'sell', 'priceHistory',
+      script
+    );
+    fn(pricesMap, holdingsSnap, cash, currentDay, totalDays, buyFn, sellFn, priceHistoryFn);
+  } catch (err) {
+    appendBotLog(`❌ Script error on day ${currentDay}: ${err.message}`);
+  }
+}
+
+function appendBotLog(msg) {
+  const logEl = document.getElementById('botLog');
+  logEl.classList.remove('hidden');
+  const line = document.createElement('div');
+  line.textContent = msg;
+  logEl.insertBefore(line, logEl.firstChild);
+  // Keep at most 50 log lines to avoid memory growth
+  while (logEl.children.length > 50) logEl.removeChild(logEl.lastChild);
+}
+
+// Initialise the script textarea with the example strategy
+document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
 </script>
 </body>
 </html>
