@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock Market Simulator</title>
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <style>
     /* ── CSS Variables (dark theme defaults) ── */
     :root {
@@ -611,6 +612,70 @@
     /* ── Horizontal-scroll wrapper for wide tables on mobile ── */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+    /* ── Email Notifications ── */
+    .email-section {
+      border-top: 1px solid var(--border);
+      margin-top: 20px;
+      padding-top: 20px;
+    }
+
+    .email-section h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 14px;
+    }
+
+    .email-optional {
+      font-size: 0.75rem;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: 0;
+      color: var(--text-faint);
+    }
+
+    .email-config-toggle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 6px 0;
+      text-decoration: underline;
+      margin-top: 4px;
+      display: inline-block;
+    }
+
+    .email-config-toggle:hover { color: var(--text); }
+
+    .email-config-panel {
+      background: var(--bg-inner);
+      border: 1px solid var(--border-inner);
+      border-radius: 8px;
+      padding: 14px;
+      margin-top: 10px;
+    }
+
+    .email-config-panel p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      line-height: 1.6;
+    }
+
+    .email-config-panel a { color: #2563eb; }
+    .email-config-panel a:hover { text-decoration: underline; }
+
+    .email-status {
+      font-size: 0.78rem;
+      color: var(--text-faint);
+      margin-top: 6px;
+    }
+
+    .email-status.configured { color: #22c55e; }
+
     /* ── Documentation Modal ── */
     .modal-overlay {
       position: fixed;
@@ -780,6 +845,54 @@
       <div class="field">
         <label>&nbsp;</label>
         <button class="btn btn-primary" id="startBtn" onclick="startSimulation()">Start Simulation</button>
+      </div>
+    </div>
+
+    <!-- Email Notifications (optional) -->
+    <div class="email-section">
+      <h2>Email Notifications <span class="email-optional">— optional</span></h2>
+      <div class="setup-grid">
+        <div class="field">
+          <label>Your Email Address</label>
+          <input type="email" id="notifyEmail" placeholder="you@example.com" oninput="saveEmailLocal()" />
+        </div>
+        <div class="field">
+          <label>Send Updates</label>
+          <select id="notifyFrequency" onchange="saveEmailLocal()">
+            <option value="0">On completion only</option>
+            <option value="30" selected>Every 30 sim-days</option>
+            <option value="60">Every 60 sim-days</option>
+            <option value="90">Every 90 sim-days</option>
+          </select>
+        </div>
+      </div>
+      <button class="email-config-toggle" onclick="toggleEmailConfig()" id="emailConfigToggle" aria-expanded="false" aria-controls="emailConfigPanel">⚙ Configure Email Service ▾</button>
+      <div class="email-config-panel hidden" id="emailConfigPanel">
+        <p>
+          Email delivery is powered by <a href="https://www.emailjs.com" target="_blank" rel="noopener noreferrer">EmailJS</a>
+          (free, no backend required). Create a free account, connect an email service, and create a template with
+          variables <code>to_email</code>, <code>subject</code>, and <code>message</code>.
+          Then paste your IDs below.
+        </p>
+        <div class="setup-grid">
+          <div class="field">
+            <label>Service ID</label>
+            <input type="text" id="ejsServiceId" placeholder="service_xxxxxxx" />
+          </div>
+          <div class="field">
+            <label>Template ID</label>
+            <input type="text" id="ejsTemplateId" placeholder="template_xxxxxxx" />
+          </div>
+          <div class="field">
+            <label>Public Key</label>
+            <input type="text" id="ejsPublicKey" placeholder="xxxxxxxxxxxx" />
+          </div>
+          <div class="field">
+            <label>&nbsp;</label>
+            <button class="btn btn-secondary" onclick="saveEmailConfig()" style="width:100%;">Save Config</button>
+          </div>
+        </div>
+        <div class="email-status" id="emailStatus">Not configured</div>
       </div>
     </div>
   </div>
@@ -1016,6 +1129,12 @@ let isPlaying = false;
 let activeStock = null;
 let speedMs = 200;
 
+// Email notification state
+let notifyEmail = '';
+let notifyFrequency = 30;  // simulation days between emails (0 = completion only)
+let lastNotifyDay = -1;
+let emailjsConfigured = false;
+
 const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
 
 const STOCK_TEMPLATES = [
@@ -1107,6 +1226,11 @@ function startSimulation() {
   transactions = [];
   currentDay = 0;
   isPlaying = false;
+  lastNotifyDay = 0;
+
+  // Read email notification settings
+  notifyEmail = document.getElementById('notifyEmail').value.trim();
+  notifyFrequency = parseInt(document.getElementById('notifyFrequency').value, 10);
 
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
 
@@ -1130,6 +1254,8 @@ function startSimulation() {
   const botCheckbox = document.getElementById('botEnabled');
   botCheckbox.checked = true;
   botEnabled = true;
+
+  sendSimulationEmail('start');
 }
 
 function resetSimulation() {
@@ -1549,11 +1675,13 @@ function tick() {
     isPlaying = false;
     document.getElementById('playPauseBtn').textContent = '▶ Play';
     showNotification('🏁 Simulation complete!');
+    sendSimulationEmail('complete');
     return;
   }
   currentDay++;
   updateDay();
   if (botEnabled) runTradingScript();
+  checkEmailNotification();
 }
 
 function stepForward() {
@@ -1564,6 +1692,8 @@ function stepForward() {
   currentDay++;
   updateDay();
   if (botEnabled) runTradingScript();
+  checkEmailNotification();
+  if (currentDay >= totalDays) sendSimulationEmail('complete');
 }
 
 function updateDay() {
@@ -1594,6 +1724,158 @@ function showNotification(msg) {
   el.classList.add('show');
   if (notifTimer) clearTimeout(notifTimer);
   notifTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ──────────────────────────────────────────────
+// Email Notifications
+// ──────────────────────────────────────────────
+
+function toggleEmailConfig() {
+  const panel = document.getElementById('emailConfigPanel');
+  const btn = document.getElementById('emailConfigToggle');
+  const isHidden = panel.classList.toggle('hidden');
+  btn.setAttribute('aria-expanded', String(!isHidden));
+  btn.textContent = isHidden ? '⚙ Configure Email Service ▾' : '⚙ Configure Email Service ▴';
+}
+
+function saveEmailLocal() {
+  const email = document.getElementById('notifyEmail').value.trim();
+  const frequency = document.getElementById('notifyFrequency').value;
+  const saved = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+  localStorage.setItem('emailConfig', JSON.stringify({ ...saved, email, frequency }));
+}
+
+function saveEmailConfig() {
+  const serviceId = document.getElementById('ejsServiceId').value.trim();
+  const templateId = document.getElementById('ejsTemplateId').value.trim();
+  const publicKey  = document.getElementById('ejsPublicKey').value.trim();
+  const email      = document.getElementById('notifyEmail').value.trim();
+  const frequency  = document.getElementById('notifyFrequency').value;
+
+  localStorage.setItem('emailConfig', JSON.stringify({ email, frequency, serviceId, templateId, publicKey }));
+
+  const statusEl = document.getElementById('emailStatus');
+  if (serviceId && templateId && publicKey) {
+    emailjs.init({ publicKey });
+    emailjsConfigured = true;
+    statusEl.textContent = '✅ Email service configured';
+    statusEl.className = 'email-status configured';
+    showNotification('✅ Email configuration saved!');
+  } else {
+    emailjsConfigured = false;
+    statusEl.textContent = 'Incomplete — fill in all three fields to enable sending';
+    statusEl.className = 'email-status';
+    showNotification('Config saved (fill all fields to enable email sending).');
+  }
+}
+
+function loadEmailConfig() {
+  const saved = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+  if (saved.email)      document.getElementById('notifyEmail').value      = saved.email;
+  if (saved.frequency)  document.getElementById('notifyFrequency').value  = saved.frequency;
+  if (saved.serviceId)  document.getElementById('ejsServiceId').value     = saved.serviceId;
+  if (saved.templateId) document.getElementById('ejsTemplateId').value    = saved.templateId;
+  if (saved.publicKey)  document.getElementById('ejsPublicKey').value     = saved.publicKey;
+
+  const statusEl = document.getElementById('emailStatus');
+  if (saved.serviceId && saved.templateId && saved.publicKey) {
+    emailjs.init({ publicKey: saved.publicKey });
+    emailjsConfigured = true;
+    statusEl.textContent = '✅ Email service configured';
+    statusEl.className = 'email-status configured';
+  }
+}
+
+function buildEmailContent(type) {
+  let holdingsVal = 0;
+  stocks.forEach(s => {
+    if (holdings[s.symbol]) {
+      holdingsVal += holdings[s.symbol].shares * s.prices[currentDay];
+    }
+  });
+  const total = cash + holdingsVal;
+  const pnl = total - startingCapital;
+  const pnlPct = startingCapital !== 0 ? ((pnl / startingCapital) * 100).toFixed(2) : '0.00';
+
+  const marketLines = stocks.map(s => {
+    const p = s.prices[currentDay];
+    const prev = s.prices[Math.max(0, currentDay - 1)];
+    const chg = p - prev;
+    return `  ${s.symbol}: $${p.toFixed(2)} (${chg >= 0 ? '+' : ''}${chg.toFixed(2)})`;
+  }).join('\n');
+
+  const openPositions = Object.keys(holdings).filter(sym => holdings[sym].shares > 0);
+  const holdingLines = openPositions.length === 0
+    ? '  No open positions'
+    : openPositions.map(sym => {
+        const h = holdings[sym];
+        const stock = stocks.find(s => s.symbol === sym);
+        const val = h.shares * stock.prices[currentDay];
+        const avgCost = (h.totalCost / h.shares).toFixed(2);
+        return `  ${sym}: ${h.shares} shares @ avg $${avgCost} = $${val.toFixed(2)}`;
+      }).join('\n');
+
+  const portfolioBlock =
+    `Portfolio (Day ${currentDay} / ${totalDays}):\n` +
+    `  Cash:            $${cash.toFixed(2)}\n` +
+    `  Holdings Value:  $${holdingsVal.toFixed(2)}\n` +
+    `  Total Value:     $${total.toFixed(2)}\n` +
+    `  P&L:             ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)} (${pnl >= 0 ? '+' : ''}${pnlPct}%)\n\n` +
+    `Market Prices:\n${marketLines}\n\n` +
+    `Holdings:\n${holdingLines}`;
+
+  let subject, message;
+
+  if (type === 'start') {
+    const condition = document.getElementById('marketCondition').value;
+    subject = '📈 Your Stock Market Simulation Has Started';
+    message =
+      `Your simulation has started!\n\n` +
+      `Settings:\n` +
+      `  Starting Capital:  $${startingCapital.toFixed(2)}\n` +
+      `  Duration:          ${totalDays} days\n` +
+      `  Market Condition:  ${condition}\n` +
+      `  Stocks:            ${stocks.map(s => s.symbol).join(', ')}\n\n` +
+      (notifyFrequency > 0
+        ? `You will receive portfolio updates every ${notifyFrequency} simulation days and a final summary when it ends.\n`
+        : `You will receive a final summary when the simulation ends.\n`);
+  } else if (type === 'update') {
+    subject = `📊 Simulation Update – Day ${currentDay} of ${totalDays}`;
+    message = `Here is your simulation update:\n\n${portfolioBlock}`;
+  } else {
+    subject = '🏁 Simulation Complete – Final Results';
+    message = `Your simulation has finished!\n\n${portfolioBlock}\n\nThank you for using the Stock Market Simulator.`;
+  }
+
+  return { subject, message };
+}
+
+function sendSimulationEmail(type) {
+  if (!notifyEmail || !emailjsConfigured) return;
+  const saved = JSON.parse(localStorage.getItem('emailConfig') || '{}');
+  if (!saved.serviceId || !saved.templateId) return;
+
+  const { subject, message } = buildEmailContent(type);
+
+  emailjs.send(saved.serviceId, saved.templateId, {
+    to_email: notifyEmail,
+    subject,
+    message,
+  }).then(() => {
+    showNotification(`📧 Email sent: ${subject}`);
+  }).catch(err => {
+    console.error('EmailJS send error:', err);
+    showNotification('❌ Failed to send email. Please check your EmailJS configuration.');
+  });
+}
+
+function checkEmailNotification() {
+  if (!notifyEmail || notifyFrequency <= 0) return;
+  if (currentDay >= totalDays) return; // completion email will be sent separately
+  if (currentDay - lastNotifyDay >= notifyFrequency) {
+    lastNotifyDay = currentDay;
+    sendSimulationEmail('update');
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -1817,6 +2099,9 @@ function appendBotLog(msg) {
 
 // Initialise the script textarea with the default strategy
 document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
+
+// Load saved email config on page startup
+loadEmailConfig();
 
 // ──────────────────────────────────────────────
 // Theme (light / dark)
