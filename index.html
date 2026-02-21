@@ -985,6 +985,45 @@ function renderChart() {
   });
   ctx.stroke();
 
+  // ── Buy / Sell indicators ──
+  const markerSize = 6;
+  const stockTrades = transactions.filter(tx => tx.symbol === stock.symbol && tx.day < prices.length);
+
+  // Draw a small legend in the top-right corner when trades exist for this stock
+  if (stockTrades.length > 0) {
+    const legendGap = 54; // px between the two legend items
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText('▲ Buy', W - PAD.right - legendGap, PAD.top + 11);
+    ctx.fillStyle = '#ef4444';
+    ctx.fillText('▼ Sell', W - PAD.right, PAD.top + 11);
+  }
+  stockTrades.forEach(trade => {
+    const mx = xOf(trade.day);
+    const my = yOf(prices[trade.day]);
+    const isBuy = trade.type === 'buy';
+    // Triangle geometry: tip is 1.2× markerSize from the price point,
+    // base is 2.8× markerSize from the price point.
+    const tipOff  = markerSize * 1.2;
+    const baseOff = markerSize * 2.8;
+    ctx.beginPath();
+    if (isBuy) {
+      // Upward-pointing triangle below the price point
+      ctx.moveTo(mx, my + tipOff);
+      ctx.lineTo(mx - markerSize, my + baseOff);
+      ctx.lineTo(mx + markerSize, my + baseOff);
+    } else {
+      // Downward-pointing triangle above the price point
+      ctx.moveTo(mx, my - tipOff);
+      ctx.lineTo(mx - markerSize, my - baseOff);
+      ctx.lineTo(mx + markerSize, my - baseOff);
+    }
+    ctx.closePath();
+    ctx.fillStyle = isBuy ? '#22c55e' : '#ef4444';
+    ctx.fill();
+  });
+
   // ── Tooltip / crosshair on hover ──
   if (chartTooltipDay >= 0 && chartTooltipDay < prices.length) {
     const ti = chartTooltipDay;
@@ -1005,7 +1044,15 @@ function renderChart() {
     ctx.fillStyle = stock.color;
     ctx.fill();
 
-    const tip = `Day ${ti}: $${prices[ti].toFixed(2)}`;
+    // Build tooltip text – include any trade on this day
+    const dayTrades = stockTrades.filter(t => t.day === ti);
+    let tip = `Day ${ti}: $${prices[ti].toFixed(2)}`;
+    if (dayTrades.length > 0) {
+      const summaries = dayTrades.map(t =>
+        `${t.type === 'buy' ? '▲ Buy' : '▼ Sell'} ${t.shares}×`
+      );
+      tip += '  |  ' + summaries.join(', ');
+    }
     ctx.font = '11px sans-serif';
     const tw = ctx.measureText(tip).width + 16;
     let bx = tx + 10;
@@ -1236,6 +1283,7 @@ function executeTrade(type) {
 
   updatePortfolioUI();
   updateTxLog();
+  renderChart();
 }
 
 // ──────────────────────────────────────────────
