@@ -268,6 +268,16 @@
       color: var(--text);
     }
 
+    .tab-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
     /* ── Price display ── */
     .price-header {
       display: flex;
@@ -1065,7 +1075,7 @@
 
       <h3>Chart &amp; Controls</h3>
       <ul>
-        <li>Click a <strong>stock tab</strong> above the chart to switch between stocks.</li>
+        <li>Click a <strong>stock tab</strong> above the chart to toggle that stock on or off; multiple stocks can be displayed at once.</li>
         <li><strong>Hover</strong> over the chart to see the exact price and any trades on that day.</li>
         <li>Green triangles (▲) mark <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
         <li>Use the <strong>Speed</strong> slider to control simulation pace (1× – 10×).</li>
@@ -1127,6 +1137,7 @@ let transactions = [];
 let playInterval = null;
 let isPlaying = false;
 let activeStock = null;
+let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
 
 // Email notification state
@@ -1279,19 +1290,52 @@ function buildStockTabs() {
     const btn = document.createElement('button');
     btn.className = 'tab-btn';
     btn.dataset.symbol = s.symbol;
-    btn.textContent = s.symbol;
-    btn.onclick = () => setActiveStock(s.symbol);
+    btn.innerHTML = `<span class="tab-dot" style="background:${s.color}"></span>${s.symbol}`;
+    btn.onclick = () => toggleStockVisibility(s.symbol);
     tabs.appendChild(btn);
   });
 }
 
-function setActiveStock(symbol) {
-  activeStock = symbol;
-  document.querySelectorAll('.tab-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.symbol === symbol);
-  });
+function toggleStockVisibility(symbol) {
+  if (visibleStocks.has(symbol)) {
+    // Prevent hiding the last visible stock
+    if (visibleStocks.size > 1) {
+      visibleStocks.delete(symbol);
+      if (activeStock === symbol) {
+        activeStock = [...visibleStocks][0];
+      }
+    }
+  } else {
+    visibleStocks.add(symbol);
+    activeStock = symbol;
+  }
+  updateTabStyles();
   renderChart();
   updatePriceHeader();
+}
+
+function setActiveStock(symbol) {
+  visibleStocks = new Set([symbol]);
+  activeStock = symbol;
+  updateTabStyles();
+  renderChart();
+  updatePriceHeader();
+}
+
+function updateTabStyles() {
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    const sym = b.dataset.symbol;
+    const s = stocks.find(st => st.symbol === sym);
+    const isVisible = visibleStocks.has(sym);
+    b.classList.toggle('active', isVisible);
+    if (isVisible && s) {
+      b.style.background = s.color;
+      b.style.borderColor = s.color;
+    } else {
+      b.style.background = '';
+      b.style.borderColor = '';
+    }
+  });
 }
 
 // ──────────────────────────────────────────────
@@ -1313,8 +1357,8 @@ function getThemeColors() {
 }
 
 function renderChart() {
-  const stock = stocks.find(s => s.symbol === activeStock);
-  if (!stock) return;
+  const visible = stocks.filter(s => visibleStocks.has(s.symbol));
+  if (visible.length === 0) return;
 
   const canvas = document.getElementById('priceChart');
   const ctx = canvas.getContext('2d');
@@ -1335,8 +1379,11 @@ function renderChart() {
   ctx.clearRect(0, 0, W, H);
   const tc = getThemeColors();
 
-  const prices = stock.prices.slice(0, currentDay + 1);
-  if (prices.length < 2) {
+  // Collect price series for all visible stocks
+  const allPriceSeries = visible.map(s => s.prices.slice(0, currentDay + 1));
+  const seriesLen = allPriceSeries[0].length;
+
+  if (seriesLen < 2) {
     ctx.fillStyle = tc.emptyText;
     ctx.textAlign = 'center';
     ctx.font = '13px sans-serif';
@@ -1344,13 +1391,15 @@ function renderChart() {
     return;
   }
 
-  const minP = Math.min(...prices);
-  const maxP = Math.max(...prices);
+  // Combined Y-axis range across all visible stocks
+  const allPrices = allPriceSeries.flat();
+  const minP = Math.min(...allPrices);
+  const maxP = Math.max(...allPrices);
   const padP = (maxP - minP) * 0.08 || 1;
   const lo = minP - padP;
   const hi = maxP + padP;
 
-  const xOf = i => PAD.left + (i / (prices.length - 1)) * plotW;
+  const xOf = i => PAD.left + (i / (seriesLen - 1)) * plotW;
   const yOf = v => PAD.top  + (1 - (v - lo) / (hi - lo)) * plotH;
 
   // ── Grid lines + Y axis labels ──
@@ -1372,10 +1421,10 @@ function renderChart() {
 
   // ── X axis labels ──
   ctx.textAlign = 'center';
-  const xTickCount = Math.min(8, prices.length);
+  const xTickCount = Math.min(8, seriesLen);
   const today = new Date();
   for (let t = 0; t <= xTickCount; t++) {
-    const idx = Math.round((t / xTickCount) * (prices.length - 1));
+    const idx = Math.round((t / xTickCount) * (seriesLen - 1));
     const x = xOf(idx);
     const dt = new Date(today);
     dt.setDate(today.getDate() + idx);
@@ -1384,112 +1433,160 @@ function renderChart() {
     ctx.fillText(label, x, PAD.top + plotH + 18);
   }
 
-  // ── Fill gradient under line ──
-  const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + plotH);
-  grad.addColorStop(0, stock.color + '40');
-  grad.addColorStop(1, stock.color + '00');
-  ctx.beginPath();
-  prices.forEach((p, i) => {
-    i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p));
-  });
-  ctx.lineTo(xOf(prices.length - 1), PAD.top + plotH);
-  ctx.lineTo(xOf(0), PAD.top + plotH);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // ── Price line ──
-  ctx.beginPath();
-  ctx.strokeStyle = stock.color;
-  ctx.lineWidth = 2;
-  ctx.lineJoin = 'round';
-  prices.forEach((p, i) => {
-    i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p));
-  });
-  ctx.stroke();
-
-  // ── Buy / Sell indicators ──
+  // ── Draw fill gradient + price line + trade markers for each visible stock ──
   const markerSize = 6;
-  const stockTrades = transactions.filter(tx => tx.symbol === stock.symbol && tx.day < prices.length);
+  visible.forEach((stock, si) => {
+    const prices = allPriceSeries[si];
 
-  // Draw a small legend in the top-right corner when trades exist for this stock
-  if (stockTrades.length > 0) {
-    const legendGap = 54; // px between the two legend items
-    ctx.font = '10px sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillStyle = '#22c55e';
-    ctx.fillText('▲ Buy', W - PAD.right - legendGap, PAD.top + 11);
-    ctx.fillStyle = '#ef4444';
-    ctx.fillText('▼ Sell', W - PAD.right, PAD.top + 11);
-  }
-  stockTrades.forEach(trade => {
-    const mx = xOf(trade.day);
-    const my = yOf(prices[trade.day]);
-    const isBuy = trade.type === 'buy';
-    // Triangle geometry: tip is 1.2× markerSize from the price point,
-    // base is 2.8× markerSize from the price point.
-    const tipOff  = markerSize * 1.2;
-    const baseOff = markerSize * 2.8;
-    ctx.beginPath();
-    if (isBuy) {
-      // Upward-pointing triangle below the price point
-      ctx.moveTo(mx, my + tipOff);
-      ctx.lineTo(mx - markerSize, my + baseOff);
-      ctx.lineTo(mx + markerSize, my + baseOff);
-    } else {
-      // Downward-pointing triangle above the price point
-      ctx.moveTo(mx, my - tipOff);
-      ctx.lineTo(mx - markerSize, my - baseOff);
-      ctx.lineTo(mx + markerSize, my - baseOff);
+    // Fill gradient (subtle; only for the active/primary stock when multiple are shown)
+    if (visible.length === 1 || stock.symbol === activeStock) {
+      const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + plotH);
+      grad.addColorStop(0, stock.color + (visible.length === 1 ? '40' : '20'));
+      grad.addColorStop(1, stock.color + '00');
+      ctx.beginPath();
+      prices.forEach((p, i) => {
+        i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p));
+      });
+      ctx.lineTo(xOf(prices.length - 1), PAD.top + plotH);
+      ctx.lineTo(xOf(0), PAD.top + plotH);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
     }
-    ctx.closePath();
-    ctx.fillStyle = isBuy ? '#22c55e' : '#ef4444';
-    ctx.fill();
+
+    // Price line
+    ctx.beginPath();
+    ctx.strokeStyle = stock.color;
+    ctx.lineWidth = stock.symbol === activeStock ? 2.5 : 1.5;
+    ctx.lineJoin = 'round';
+    prices.forEach((p, i) => {
+      i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p));
+    });
+    ctx.stroke();
+
+    // Buy / Sell trade markers
+    const stockTrades = transactions.filter(tx => tx.symbol === stock.symbol && tx.day < prices.length);
+    stockTrades.forEach(trade => {
+      const mx = xOf(trade.day);
+      const my = yOf(prices[trade.day]);
+      const isBuy = trade.type === 'buy';
+      const tipOff  = markerSize * 1.2;
+      const baseOff = markerSize * 2.8;
+      ctx.beginPath();
+      if (isBuy) {
+        ctx.moveTo(mx, my + tipOff);
+        ctx.lineTo(mx - markerSize, my + baseOff);
+        ctx.lineTo(mx + markerSize, my + baseOff);
+      } else {
+        ctx.moveTo(mx, my - tipOff);
+        ctx.lineTo(mx - markerSize, my - baseOff);
+        ctx.lineTo(mx + markerSize, my - baseOff);
+      }
+      ctx.closePath();
+      ctx.fillStyle = isBuy ? '#22c55e' : '#ef4444';
+      ctx.fill();
+    });
   });
+
+  // ── Legend ──
+  if (visible.length > 1) {
+    // Multi-stock: show colour swatch + symbol for each visible stock
+    const legendItemH = 15;
+    const swatchW = 18;
+    ctx.font = '10px sans-serif';
+    visible.forEach((stock, i) => {
+      const ly = PAD.top + 4 + i * legendItemH;
+      ctx.strokeStyle = stock.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(W - PAD.right - swatchW - 36, ly + 4);
+      ctx.lineTo(W - PAD.right - 36, ly + 4);
+      ctx.stroke();
+      ctx.fillStyle = stock.symbol === activeStock ? tc.tooltipText : tc.axisText;
+      ctx.textAlign = 'left';
+      ctx.fillText(stock.symbol, W - PAD.right - 33, ly + 8);
+    });
+  } else {
+    // Single stock: show ▲ Buy / ▼ Sell legend when trades exist
+    const stockTrades = transactions.filter(tx => tx.symbol === visible[0].symbol && tx.day < seriesLen);
+    if (stockTrades.length > 0) {
+      const legendGap = 54;
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#22c55e';
+      ctx.fillText('▲ Buy', W - PAD.right - legendGap, PAD.top + 11);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('▼ Sell', W - PAD.right, PAD.top + 11);
+    }
+  }
 
   // ── Tooltip / crosshair on hover ──
-  if (chartTooltipDay >= 0 && chartTooltipDay < prices.length) {
+  if (chartTooltipDay >= 0 && chartTooltipDay < seriesLen) {
     const ti = chartTooltipDay;
-    const tx = xOf(ti);
-    const ty = yOf(prices[ti]);
+    const txX = xOf(ti);
 
+    // Vertical crosshair
     ctx.beginPath();
     ctx.strokeStyle = tc.axisText;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
-    ctx.moveTo(tx, PAD.top);
-    ctx.lineTo(tx, PAD.top + plotH);
+    ctx.moveTo(txX, PAD.top);
+    ctx.lineTo(txX, PAD.top + plotH);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.beginPath();
-    ctx.arc(tx, ty, 5, 0, Math.PI * 2);
-    ctx.fillStyle = stock.color;
-    ctx.fill();
+    // Dot for each visible stock at this day
+    visible.forEach((stock, si) => {
+      const ty = yOf(allPriceSeries[si][ti]);
+      ctx.beginPath();
+      ctx.arc(txX, ty, 4, 0, Math.PI * 2);
+      ctx.fillStyle = stock.color;
+      ctx.fill();
+    });
 
-    // Build tooltip text – include any trade on this day
-    const dayTrades = stockTrades.filter(t => t.day === ti);
-    let tip = `Day ${ti}: $${prices[ti].toFixed(2)}`;
-    if (dayTrades.length > 0) {
-      const summaries = dayTrades.map(t =>
-        `${t.type === 'buy' ? '▲ Buy' : '▼ Sell'} ${t.shares}×`
-      );
-      tip += '  |  ' + summaries.join(', ');
-    }
+    // Build multi-line tooltip
     ctx.font = '11px sans-serif';
-    const tw = ctx.measureText(tip).width + 16;
-    let bx = tx + 10;
-    if (bx + tw > W - 4) bx = tx - tw - 10;
-    const by = Math.max(PAD.top, Math.min(ty - 14, PAD.top + plotH - 28));
+    const dayLabel = `Day ${ti}`;
+    const tooltipLines = visible.map((stock, si) => {
+      const prices = allPriceSeries[si];
+      const stockTrades = transactions.filter(tx => tx.symbol === stock.symbol && tx.day < prices.length);
+      const dayTrades = stockTrades.filter(t => t.day === ti);
+      let text = `${stock.symbol}: $${prices[ti].toFixed(2)}`;
+      if (dayTrades.length > 0) {
+        text += '  ' + dayTrades.map(t => `${t.type === 'buy' ? '▲' : '▼'} ${t.shares}×`).join(', ');
+      }
+      return { text, color: stock.color };
+    });
+
+    const lineH = 16;
+    const tipPad = 8;
+    const maxTextW = Math.max(
+      ctx.measureText(dayLabel).width,
+      ...tooltipLines.map(l => ctx.measureText(l.text).width)
+    );
+    const tw = maxTextW + tipPad * 2;
+    const th = (1 + tooltipLines.length) * lineH + tipPad;
+    let bx = txX + 10;
+    if (bx + tw > W - 4) bx = txX - tw - 10;
+    const activeIdx = visible.findIndex(s => s.symbol === activeStock);
+    const refSeriesIdx = activeIdx >= 0 ? activeIdx : 0;
+    const refY = yOf(allPriceSeries[refSeriesIdx][ti]);
+    const by = Math.max(PAD.top, Math.min(refY - 14, PAD.top + plotH - th));
+
     ctx.fillStyle = tc.tooltipBg;
     ctx.strokeStyle = tc.tooltipBorder;
     ctx.lineWidth = 1;
-    roundRect(ctx, bx, by, tw, 22, 4);
+    roundRect(ctx, bx, by, tw, th, 4);
     ctx.fill();
     ctx.stroke();
+
     ctx.fillStyle = tc.tooltipText;
     ctx.textAlign = 'left';
-    ctx.fillText(tip, bx + 8, by + 15);
+    ctx.fillText(dayLabel, bx + tipPad, by + lineH);
+    tooltipLines.forEach((line, i) => {
+      ctx.fillStyle = line.color;
+      ctx.fillText(line.text, bx + tipPad, by + (i + 2) * lineH);
+    });
   }
 }
 
@@ -1510,15 +1607,16 @@ function roundRect(ctx, x, y, w, h, r) {
 function attachChartHover() {
   const canvas = document.getElementById('priceChart');
   canvas.onmousemove = e => {
-    const stock = stocks.find(s => s.symbol === activeStock);
-    if (!stock || currentDay < 1) return;
+    if (currentDay < 1) return;
+    const visible = stocks.filter(s => visibleStocks.has(s.symbol));
+    if (visible.length === 0) return;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const PAD_LEFT = 60, PAD_RIGHT = 18;
     const plotW = rect.width - PAD_LEFT - PAD_RIGHT;
-    const prices = stock.prices.slice(0, currentDay + 1);
-    const idx = Math.round(((mouseX - PAD_LEFT) / plotW) * (prices.length - 1));
-    chartTooltipDay = Math.max(0, Math.min(prices.length - 1, idx));
+    const seriesLen = visible[0].prices.slice(0, currentDay + 1).length;
+    const idx = Math.round(((mouseX - PAD_LEFT) / plotW) * (seriesLen - 1));
+    chartTooltipDay = Math.max(0, Math.min(seriesLen - 1, idx));
     renderChart();
   };
   canvas.onmouseleave = () => {
