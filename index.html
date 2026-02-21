@@ -559,6 +559,10 @@
         </select>
       </div>
       <div class="field">
+        <label>Trading Cost per Order ($)</label>
+        <input type="number" id="tradingCostInput" value="1.00" min="0" step="0.01" />
+      </div>
+      <div class="field">
         <label>&nbsp;</label>
         <button class="btn btn-primary" id="startBtn" onclick="startSimulation()">Start Simulation</button>
       </div>
@@ -622,10 +626,9 @@
           <div class="bot-header">
             <h3 style="margin:0;">🤖 Auto-Trading Bot</h3>
             <label class="bot-toggle">
-              <input type="checkbox" id="botEnabled" onchange="toggleBot(this.checked)" />
+              <input type="checkbox" id="botEnabled" checked onchange="toggleBot(this.checked)" />
               Enable
             </label>
-            <button class="btn btn-secondary" style="padding:5px 12px; font-size:0.8rem;" onclick="runBotOnce()">▶ Run Once</button>
           </div>
           <p class="bot-api-hint">
             Write JavaScript that executes each simulation day when enabled. Available variables and functions:<br>
@@ -633,6 +636,16 @@
             <code>buy(symbol, shares)</code> · <code>sell(symbol, shares)</code> · <code>priceHistory(symbol, n)</code><br>
             <em>Note: <code>cash</code> is a snapshot at the start of each day's execution; <code>buy()</code> and <code>sell()</code> validate against the live balance.</em>
           </p>
+          <div class="field" style="margin-bottom:8px;">
+            <label>Predefined Strategy</label>
+            <select id="botStrategySelect" onchange="loadBotStrategy(this.value)">
+              <option value="sma" selected>Simple Moving Average (SMA)</option>
+              <option value="rsi">RSI (Relative Strength Index)</option>
+              <option value="momentum">Momentum</option>
+              <option value="buyhold">Buy &amp; Hold</option>
+              <option value="meanreversion">Mean Reversion</option>
+            </select>
+          </div>
           <textarea class="bot-script" id="botScript" spellcheck="false"></textarea>
           <div class="bot-log hidden" id="botLog"></div>
         </div>
@@ -675,26 +688,6 @@
               <tr><td colspan="4" style="color:#4b5563; text-align:center; padding:12px;">No positions yet</td></tr>
             </tbody>
           </table>
-
-          <!-- Trade Form -->
-          <div class="trade-form">
-            <h4>Place Order</h4>
-            <div class="trade-row">
-              <label>Stock</label>
-              <select id="tradeStock"></select>
-            </div>
-            <div class="trade-row">
-              <label>Shares</label>
-              <input type="number" id="tradeShares" value="10" min="1" step="1" />
-            </div>
-            <div class="trade-row" style="font-size:0.78rem; color:#6b7280; margin-bottom:8px;">
-              <span id="tradePreview">Cost: —</span>
-            </div>
-            <div class="trade-btns">
-              <button class="btn btn-success" onclick="executeTrade('buy')">Buy</button>
-              <button class="btn btn-danger" onclick="executeTrade('sell')">Sell</button>
-            </div>
-          </div>
         </div>
 
         <div class="card">
@@ -721,6 +714,7 @@ let currentDay = 0;
 let totalDays = 365;
 let startingCapital = 10000;
 let cash = 10000;
+let tradingCost = 1.0;   // flat fee per order
 let holdings = {};   // { symbol: { shares: number, totalCost: number } }
 let transactions = [];
 let playInterval = null;
@@ -795,6 +789,7 @@ function getMarketParams(condition) {
 function startSimulation() {
   startingCapital = parseFloat(document.getElementById('startCapital').value) || 10000;
   totalDays = parseInt(document.getElementById('simPeriod').value);
+  tradingCost = parseFloat(document.getElementById('tradingCostInput').value) || 0;
   const condition = document.getElementById('marketCondition').value;
   const numStocks = parseInt(document.getElementById('numStocks').value);
   const { drift, volMult } = getMarketParams(condition);
@@ -825,7 +820,6 @@ function startSimulation() {
   document.getElementById('simArea').classList.remove('hidden');
 
   buildStockTabs();
-  populateTradeSelect();
   setActiveStock(stocks[0].symbol);
   attachChartHover();
   updatePortfolioUI();
@@ -840,10 +834,8 @@ function startSimulation() {
   botLogEl.classList.add('hidden');
 
   const botCheckbox = document.getElementById('botEnabled');
-  if (botCheckbox.checked) {
-    botCheckbox.checked = false;
-    botEnabled = false;
-  }
+  botCheckbox.checked = true;
+  botEnabled = true;
 }
 
 function resetSimulation() {
@@ -880,8 +872,6 @@ function setActiveStock(symbol) {
   });
   renderChart();
   updatePriceHeader();
-  document.getElementById('tradeStock').value = symbol;
-  updateTradePreview();
 }
 
 // ──────────────────────────────────────────────
@@ -1210,83 +1200,6 @@ function updatePortfolioUI() {
 }
 
 // ──────────────────────────────────────────────
-// Trade
-// ──────────────────────────────────────────────
-
-function populateTradeSelect() {
-  const sel = document.getElementById('tradeStock');
-  sel.innerHTML = '';
-  stocks.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.symbol;
-    opt.textContent = `${s.symbol} – ${s.name}`;
-    sel.appendChild(opt);
-  });
-  sel.onchange = updateTradePreview;
-  document.getElementById('tradeShares').oninput = updateTradePreview;
-}
-
-function updateTradePreview() {
-  const sym = document.getElementById('tradeStock').value;
-  const shares = parseInt(document.getElementById('tradeShares').value) || 0;
-  const stock = stocks.find(s => s.symbol === sym);
-  if (!stock) return;
-  const price = stock.prices[currentDay];
-  const cost = shares * price;
-  document.getElementById('tradePreview').textContent =
-    `Price: $${price.toFixed(2)} · Cost: $${cost.toFixed(2)}`;
-}
-
-function executeTrade(type) {
-  const sym = document.getElementById('tradeStock').value;
-  const shares = parseInt(document.getElementById('tradeShares').value);
-  if (!shares || shares <= 0) { showNotification('Enter a valid share quantity.'); return; }
-
-  const stock = stocks.find(s => s.symbol === sym);
-  if (!stock) return;
-  const price = stock.prices[currentDay];
-  const cost = shares * price;
-
-  if (type === 'buy') {
-    if (cost > cash) {
-      showNotification(`Insufficient funds. Need $${cost.toFixed(2)}, have $${cash.toFixed(2)}.`);
-      return;
-    }
-    cash -= cost;
-    if (!holdings[sym]) holdings[sym] = { shares: 0, totalCost: 0 };
-    holdings[sym].shares += shares;
-    holdings[sym].totalCost += cost;
-    showNotification(`✅ Bought ${shares} shares of ${sym} @ $${price.toFixed(2)}`);
-  } else {
-    if (!holdings[sym] || holdings[sym].shares < shares) {
-      showNotification(`Not enough shares. You own ${(holdings[sym] || {}).shares || 0} shares of ${sym}.`);
-      return;
-    }
-    cash += cost;
-    holdings[sym].shares -= shares;
-    // Reduce cost basis proportionally: `shares` here is the sale quantity,
-    // so (holdings[sym].shares + shares) restores the original pre-sale total.
-    const ratio = shares / (holdings[sym].shares + shares);
-    holdings[sym].totalCost *= (1 - ratio);
-    if (holdings[sym].shares === 0) delete holdings[sym];
-    showNotification(`✅ Sold ${shares} shares of ${sym} @ $${price.toFixed(2)}`);
-  }
-
-  transactions.unshift({
-    type,
-    symbol: sym,
-    shares,
-    price,
-    total: cost,
-    day: currentDay
-  });
-
-  updatePortfolioUI();
-  updateTxLog();
-  renderChart();
-}
-
-// ──────────────────────────────────────────────
 // Transaction log
 // ──────────────────────────────────────────────
 
@@ -1352,7 +1265,6 @@ function updateDay() {
   updatePriceHeader();
   updatePortfolioUI();
   updateMarketTable();
-  updateTradePreview();
 }
 
 function updateSpeed(val) {
@@ -1381,9 +1293,10 @@ function showNotification(msg) {
 // Auto-Trading Bot
 // ──────────────────────────────────────────────
 
-let botEnabled = false;
+let botEnabled = true;
 
-const DEFAULT_BOT_SCRIPT =
+const BOT_SCRIPTS = {
+  sma:
 `// Simple Moving Average (SMA) strategy
 // Buys when the price dips 3% below its 10-day average (dip-buying).
 // Sells when the price rises 5% above its 10-day average (take profit).
@@ -1405,15 +1318,95 @@ for (const symbol of Object.keys(prices)) {
     // Price rose 5% above MA — sell all
     sell(symbol, owned);
   }
-}`;
+}`,
+
+  rsi:
+`// RSI Strategy: Buy when RSI < 30 (oversold), sell when RSI > 70 (overbought).
+function calcRSI(symbol, period) {
+  const hist = priceHistory(symbol, period + 1);
+  if (hist.length < period + 1) return null;
+  let gains = 0, losses = 0;
+  for (let i = 1; i < hist.length; i++) {
+    const diff = hist[i] - hist[i - 1];
+    if (diff > 0) gains += diff; else losses -= diff;
+  }
+  const avgGain = gains / period;
+  const avgLoss = losses / period;
+  if (avgLoss === 0) return 100;
+  return 100 - (100 / (1 + avgGain / avgLoss));
+}
+
+for (const symbol of Object.keys(prices)) {
+  const rsi = calcRSI(symbol, 14);
+  if (rsi === null) continue;
+  const owned = holdings[symbol] ? holdings[symbol].shares : 0;
+  if (rsi < 30 && cash > prices[symbol]) {
+    const maxShares = Math.floor(cash * 0.25 / prices[symbol]);
+    if (maxShares > 0) buy(symbol, maxShares);
+  } else if (rsi > 70 && owned > 0) {
+    sell(symbol, owned);
+  }
+}`,
+
+  momentum:
+`// Momentum: Buy top-performing stocks over 20 days, sell the worst performers.
+const perf = {};
+for (const symbol of Object.keys(prices)) {
+  const hist = priceHistory(symbol, 20);
+  if (hist.length < 2) continue;
+  perf[symbol] = (prices[symbol] - hist[0]) / hist[0];
+}
+const symbols = Object.keys(perf).sort((a, b) => perf[b] - perf[a]);
+const topN = Math.ceil(symbols.length / 2);
+symbols.forEach((symbol, idx) => {
+  const owned = holdings[symbol] ? holdings[symbol].shares : 0;
+  if (idx < topN && perf[symbol] > 0.02 && cash > prices[symbol]) {
+    const maxShares = Math.floor(cash * 0.15 / prices[symbol]);
+    if (maxShares > 0) buy(symbol, maxShares);
+  } else if (idx >= topN && owned > 0 && perf[symbol] < -0.02) {
+    sell(symbol, owned);
+  }
+});`,
+
+  buyhold:
+`// Buy & Hold: On day 1, invest equally across all stocks. Never sell.
+if (day === 1) {
+  const symbols = Object.keys(prices);
+  const perStock = cash / symbols.length;
+  for (const symbol of symbols) {
+    const maxShares = Math.floor(perStock / prices[symbol]);
+    if (maxShares > 0) buy(symbol, maxShares);
+  }
+}`,
+
+  meanreversion:
+`// Mean Reversion: Buy when a stock has dropped 5%+ below its 30-day average,
+// sell when it rises 8%+ above.
+for (const symbol of Object.keys(prices)) {
+  const hist = priceHistory(symbol, 30);
+  if (hist.length < 15) continue;
+  const avg = hist.reduce((a, b) => a + b, 0) / hist.length;
+  const deviation = (prices[symbol] - avg) / avg;
+  const owned = holdings[symbol] ? holdings[symbol].shares : 0;
+  if (deviation < -0.05 && cash > prices[symbol]) {
+    const maxShares = Math.floor(cash * 0.2 / prices[symbol]);
+    if (maxShares > 0) buy(symbol, maxShares);
+  } else if (deviation > 0.08 && owned > 0) {
+    sell(symbol, owned);
+  }
+}`
+};
+
+const DEFAULT_BOT_SCRIPT = BOT_SCRIPTS.sma;
+
+function loadBotStrategy(key) {
+  if (BOT_SCRIPTS[key]) {
+    document.getElementById('botScript').value = BOT_SCRIPTS[key];
+  }
+}
 
 function toggleBot(enabled) {
   botEnabled = enabled;
-}
-
-function runBotOnce() {
-  if (stocks.length === 0) { showNotification('Start a simulation first.'); return; }
-  runTradingScript();
 }
 
 /**
@@ -1455,7 +1448,7 @@ function runTradingScript() {
     shares = Math.floor(shares);
     if (!shares || shares <= 0) { appendBotLog(`Invalid shares for buy: ${shares}`); return; }
     const price = stock.prices[currentDay];
-    const cost = shares * price;
+    const cost = shares * price + tradingCost;
     if (cost > cash) {
       appendBotLog(`Insufficient funds for ${symbol} (need $${cost.toFixed(2)}, have $${cash.toFixed(2)})`);
       return;
@@ -1465,7 +1458,7 @@ function runTradingScript() {
     holdings[symbol].shares += shares;
     holdings[symbol].totalCost += cost;
     transactions.unshift({ type: 'buy', symbol, shares, price, total: cost, day: currentDay });
-    appendBotLog(`🤖 BUY  ${shares}× ${symbol} @ $${price.toFixed(2)}`);
+    appendBotLog(`🤖 BUY  ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
     updatePortfolioUI();
     updateTxLog();
   };
@@ -1481,14 +1474,14 @@ function runTradingScript() {
       return;
     }
     const price = stock.prices[currentDay];
-    const proceeds = shares * price;
+    const proceeds = shares * price - tradingCost;
     cash += proceeds;
     holdings[symbol].shares -= shares;
     const ratio = shares / (holdings[symbol].shares + shares);
     holdings[symbol].totalCost *= (1 - ratio);
     if (holdings[symbol].shares === 0) delete holdings[symbol];
     transactions.unshift({ type: 'sell', symbol, shares, price, total: proceeds, day: currentDay });
-    appendBotLog(`🤖 SELL ${shares}× ${symbol} @ $${price.toFixed(2)}`);
+    appendBotLog(`🤖 SELL ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
     updatePortfolioUI();
     updateTxLog();
   };
@@ -1515,7 +1508,7 @@ function appendBotLog(msg) {
   while (logEl.children.length > 50) logEl.removeChild(logEl.lastChild);
 }
 
-// Initialise the script textarea with the example strategy
+// Initialise the script textarea with the default strategy
 document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
 </script>
 </body>
