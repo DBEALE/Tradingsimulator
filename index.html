@@ -1,32 +1,78 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock Market Simulator</title>
   <style>
+    /* ── CSS Variables (dark theme defaults) ── */
+    :root {
+      --bg: #0f1117;
+      --bg-card: #1a1d27;
+      --bg-input: #0f1117;
+      --bg-inner: #0a0c12;
+      --bg-trade-row: #1a1d27;
+      --border: #2e3348;
+      --border-inner: #1f2437;
+      --text: #e0e0e0;
+      --text-muted: #9ca3af;
+      --text-faint: #6b7280;
+      --text-dim: #4b5563;
+      --text-heading: #fff;
+      --scrollbar: #374151;
+      --tooltip-bg: #1e293b;
+      --tooltip-border: #334155;
+      --tab-bg: #0f1117;
+      --btn-secondary-bg: #374151;
+      --btn-secondary-text: #e0e0e0;
+      --btn-secondary-hover: #4b5563;
+    }
+
+    [data-theme="light"] {
+      --bg: #f3f4f6;
+      --bg-card: #ffffff;
+      --bg-input: #f9fafb;
+      --bg-inner: #f1f5f9;
+      --bg-trade-row: #ffffff;
+      --border: #d1d5db;
+      --border-inner: #e5e7eb;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+      --text-faint: #9ca3af;
+      --text-dim: #9ca3af;
+      --text-heading: #111827;
+      --scrollbar: #9ca3af;
+      --tooltip-bg: #ffffff;
+      --tooltip-border: #d1d5db;
+      --tab-bg: #f3f4f6;
+      --btn-secondary-bg: #e5e7eb;
+      --btn-secondary-text: #374151;
+      --btn-secondary-hover: #d1d5db;
+    }
+
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #0f1117;
-      color: #e0e0e0;
+      background: var(--bg);
+      color: var(--text);
       min-height: 100vh;
     }
 
     header {
-      background: #1a1d27;
-      border-bottom: 1px solid #2e3348;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
       padding: 14px 24px;
       display: flex;
       align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
     }
 
     header h1 {
       font-size: 1.4rem;
       font-weight: 700;
-      color: #fff;
+      color: var(--text-heading);
     }
 
     header span.badge {
@@ -40,6 +86,31 @@
       letter-spacing: 0.05em;
     }
 
+    .header-actions {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-icon {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      line-height: 1;
+    }
+
+    .btn-icon:hover {
+      background: var(--border);
+      color: var(--text-heading);
+    }
+
     .container {
       max-width: 1280px;
       margin: 0 auto;
@@ -48,8 +119,8 @@
 
     /* ── Setup panel ── */
     .setup-panel {
-      background: #1a1d27;
-      border: 1px solid #2e3348;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px;
       margin-bottom: 24px;
@@ -58,7 +129,7 @@
     .setup-panel h2 {
       font-size: 1rem;
       font-weight: 600;
-      color: #9ca3af;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.07em;
       margin-bottom: 18px;
@@ -74,17 +145,17 @@
     .field label {
       display: block;
       font-size: 0.8rem;
-      color: #9ca3af;
+      color: var(--text-muted);
       margin-bottom: 6px;
       font-weight: 500;
     }
 
     .field input, .field select {
       width: 100%;
-      background: #0f1117;
-      border: 1px solid #2e3348;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      color: #e0e0e0;
+      color: var(--text);
       padding: 8px 12px;
       font-size: 0.9rem;
       outline: none;
@@ -131,11 +202,11 @@
     .btn-danger:hover:not(:disabled) { background: #b91c1c; }
 
     .btn-secondary {
-      background: #374151;
-      color: #e0e0e0;
+      background: var(--btn-secondary-bg);
+      color: var(--btn-secondary-text);
     }
 
-    .btn-secondary:hover:not(:disabled) { background: #4b5563; }
+    .btn-secondary:hover:not(:disabled) { background: var(--btn-secondary-hover); }
 
     /* ── Main layout ── */
     .main-grid {
@@ -150,8 +221,8 @@
 
     /* ── Card ── */
     .card {
-      background: #1a1d27;
-      border: 1px solid #2e3348;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 20px;
     }
@@ -159,7 +230,7 @@
     .card h3 {
       font-size: 0.85rem;
       font-weight: 600;
-      color: #9ca3af;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.07em;
       margin-bottom: 16px;
@@ -179,9 +250,9 @@
       font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
-      border: 1px solid #2e3348;
-      background: #0f1117;
-      color: #9ca3af;
+      border: 1px solid var(--border);
+      background: var(--tab-bg);
+      color: var(--text-muted);
       transition: all 0.15s;
     }
 
@@ -192,8 +263,8 @@
     }
 
     .tab-btn:hover:not(.active) {
-      border-color: #4b5563;
-      color: #e0e0e0;
+      border-color: var(--text-dim);
+      color: var(--text);
     }
 
     /* ── Price display ── */
@@ -202,12 +273,13 @@
       align-items: baseline;
       gap: 12px;
       margin-bottom: 4px;
+      flex-wrap: wrap;
     }
 
     .price-value {
       font-size: 2rem;
       font-weight: 700;
-      color: #fff;
+      color: var(--text-heading);
     }
 
     .price-change {
@@ -220,7 +292,7 @@
 
     .price-meta {
       font-size: 0.8rem;
-      color: #6b7280;
+      color: var(--text-faint);
       margin-bottom: 16px;
     }
 
@@ -249,7 +321,7 @@
 
     .day-display {
       font-size: 0.85rem;
-      color: #9ca3af;
+      color: var(--text-muted);
       margin-left: auto;
     }
 
@@ -260,7 +332,7 @@
       gap: 10px;
       margin-top: 12px;
       font-size: 0.8rem;
-      color: #9ca3af;
+      color: var(--text-muted);
     }
 
     .speed-row input[type=range] {
@@ -277,22 +349,22 @@
     }
 
     .stat-box {
-      background: #0f1117;
-      border: 1px solid #2e3348;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 12px;
     }
 
     .stat-box .label {
       font-size: 0.75rem;
-      color: #6b7280;
+      color: var(--text-faint);
       margin-bottom: 4px;
     }
 
     .stat-box .value {
       font-size: 1.1rem;
       font-weight: 700;
-      color: #fff;
+      color: var(--text-heading);
     }
 
     .stat-box .value.up { color: #22c55e; }
@@ -307,24 +379,24 @@
 
     .holdings-table th {
       text-align: left;
-      color: #6b7280;
+      color: var(--text-faint);
       font-weight: 500;
       padding: 4px 6px;
-      border-bottom: 1px solid #2e3348;
+      border-bottom: 1px solid var(--border);
     }
 
     .holdings-table td {
       padding: 6px 6px;
-      border-bottom: 1px solid #1f2437;
-      color: #e0e0e0;
+      border-bottom: 1px solid var(--border-inner);
+      color: var(--text);
     }
 
     .holdings-table tr:last-child td { border-bottom: none; }
 
     /* ── Trade form ── */
     .trade-form {
-      background: #0f1117;
-      border: 1px solid #2e3348;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 14px;
       margin-top: 12px;
@@ -332,7 +404,7 @@
 
     .trade-form h4 {
       font-size: 0.8rem;
-      color: #9ca3af;
+      color: var(--text-muted);
       margin-bottom: 10px;
       font-weight: 600;
       text-transform: uppercase;
@@ -346,14 +418,14 @@
       margin-bottom: 8px;
     }
 
-    .trade-row label { font-size: 0.8rem; color: #9ca3af; width: 60px; flex-shrink: 0; }
+    .trade-row label { font-size: 0.8rem; color: var(--text-muted); width: 60px; flex-shrink: 0; }
 
     .trade-row input, .trade-row select {
       flex: 1;
-      background: #1a1d27;
-      border: 1px solid #2e3348;
+      background: var(--bg-trade-row);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      color: #e0e0e0;
+      color: var(--text);
       padding: 6px 10px;
       font-size: 0.85rem;
       outline: none;
@@ -372,15 +444,15 @@
     }
 
     .tx-log::-webkit-scrollbar { width: 4px; }
-    .tx-log::-webkit-scrollbar-track { background: #0f1117; }
-    .tx-log::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    .tx-log::-webkit-scrollbar-track { background: var(--bg-input); }
+    .tx-log::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
 
     .tx-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 5px 0;
-      border-bottom: 1px solid #1f2437;
+      border-bottom: 1px solid var(--border-inner);
       gap: 8px;
     }
 
@@ -397,14 +469,14 @@
     .tx-badge.buy { background: #16a34a22; color: #22c55e; }
     .tx-badge.sell { background: #dc262622; color: #ef4444; }
 
-    .tx-detail { flex: 1; color: #9ca3af; }
-    .tx-value { color: #e0e0e0; font-weight: 600; flex-shrink: 0; }
+    .tx-detail { flex: 1; color: var(--text-muted); }
+    .tx-value { color: var(--text); font-weight: 600; flex-shrink: 0; }
 
     /* ── Empty state ── */
     .empty-state {
       text-align: center;
       padding: 40px;
-      color: #4b5563;
+      color: var(--text-dim);
     }
 
     .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
@@ -414,12 +486,12 @@
       position: fixed;
       bottom: 24px;
       right: 24px;
-      background: #1e293b;
-      border: 1px solid #334155;
+      background: var(--tooltip-bg);
+      border: 1px solid var(--tooltip-border);
       border-radius: 8px;
       padding: 12px 20px;
       font-size: 0.85rem;
-      color: #e0e0e0;
+      color: var(--text);
       box-shadow: 0 8px 24px rgba(0,0,0,0.4);
       transform: translateY(80px);
       opacity: 0;
@@ -449,7 +521,7 @@
       align-items: center;
       gap: 6px;
       font-size: 0.82rem;
-      color: #9ca3af;
+      color: var(--text-muted);
       cursor: pointer;
       margin-left: auto;
     }
@@ -463,13 +535,13 @@
 
     .bot-api-hint {
       font-size: 0.75rem;
-      color: #4b5563;
+      color: var(--text-dim);
       margin-bottom: 10px;
       line-height: 1.6;
     }
 
     .bot-api-hint code {
-      background: #1f2437;
+      background: var(--border-inner);
       padding: 1px 5px;
       border-radius: 3px;
       color: #93c5fd;
@@ -479,10 +551,10 @@
     .bot-script {
       width: 100%;
       height: 180px;
-      background: #0f1117;
-      border: 1px solid #2e3348;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
       border-radius: 8px;
-      color: #e0e0e0;
+      color: var(--text);
       font-family: 'Courier New', Courier, monospace;
       font-size: 0.82rem;
       padding: 10px;
@@ -501,16 +573,155 @@
       overflow-y: auto;
       font-size: 0.75rem;
       font-family: 'Courier New', Courier, monospace;
-      background: #0a0c12;
-      border: 1px solid #1f2437;
+      background: var(--bg-inner);
+      border: 1px solid var(--border-inner);
       border-radius: 6px;
       padding: 6px 10px;
-      color: #6b7280;
+      color: var(--text-faint);
     }
 
     .bot-log::-webkit-scrollbar { width: 4px; }
-    .bot-log::-webkit-scrollbar-track { background: #0f1117; }
-    .bot-log::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+    .bot-log::-webkit-scrollbar-track { background: var(--bg-input); }
+    .bot-log::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+
+    /* ── Mobile responsive ── */
+    @media (max-width: 600px) {
+      header { padding: 10px 16px; gap: 8px; }
+      header h1 { font-size: 1.1rem; }
+      .container { padding: 16px 12px; }
+      .setup-panel { padding: 16px; }
+      .setup-grid { grid-template-columns: 1fr; }
+      .card { padding: 14px; }
+      .chart-wrapper { height: 220px; }
+      .price-value { font-size: 1.5rem; }
+      .sim-controls { gap: 6px; }
+      .sim-controls .btn { padding: 7px 10px; font-size: 0.8rem; }
+      .day-display { width: 100%; margin-left: 0; margin-top: 4px; text-align: center; }
+      .bot-script { height: 140px; }
+    }
+
+    @media (max-width: 400px) {
+      header h1 { font-size: 1rem; }
+      .portfolio-summary { grid-template-columns: 1fr; }
+      .stat-box .value { font-size: 1rem; }
+      .price-value { font-size: 1.3rem; }
+      .card { padding: 12px; }
+    }
+
+    /* ── Horizontal-scroll wrapper for wide tables on mobile ── */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* ── Documentation Modal ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 2000;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 16px;
+      overflow-y: auto;
+    }
+
+    .modal-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 720px;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.4);
+      margin: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-header h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 6px;
+      line-height: 1;
+    }
+
+    .modal-close:hover { background: var(--border); color: var(--text-heading); }
+
+    .modal-body {
+      padding: 20px 24px 24px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .modal-body h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin: 20px 0 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .modal-body h3:first-child { margin-top: 0; }
+
+    .modal-body p { margin-bottom: 10px; }
+
+    .modal-body ul, .modal-body ol { padding-left: 20px; margin-bottom: 10px; }
+
+    .modal-body li { margin-bottom: 4px; }
+
+    .modal-body code {
+      background: var(--border-inner);
+      color: #93c5fd;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.85em;
+    }
+
+    .modal-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+      font-size: 0.85rem;
+    }
+
+    .modal-body table th {
+      text-align: left;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .modal-body table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border-inner);
+      color: var(--text);
+    }
+
+    .modal-body table tr:last-child td { border-bottom: none; }
+
+    @media (max-width: 600px) {
+      .modal-box { border-radius: 12px; }
+      .modal-header { padding: 16px 16px 12px; }
+      .modal-body { padding: 16px; }
+    }
   </style>
 </head>
 <body>
@@ -518,6 +729,10 @@
 <header>
   <h1>📈 Stock Market Simulator</h1>
   <span class="badge">Simulator</span>
+  <div class="header-actions">
+    <button class="btn-icon" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">☀️</button>
+    <button class="btn-icon" onclick="openDocs()" title="Documentation">📖 Docs</button>
+  </div>
 </header>
 
 <div class="container">
@@ -606,6 +821,7 @@
         <!-- Market Overview mini table -->
         <div class="card">
           <h3>Market Overview</h3>
+          <div class="table-scroll">
           <table class="holdings-table" id="marketTable">
             <thead>
               <tr>
@@ -619,6 +835,7 @@
             </thead>
             <tbody id="marketTableBody"></tbody>
           </table>
+          </div>
         </div>
 
         <!-- Auto-Trading Bot -->
@@ -685,7 +902,7 @@
               </tr>
             </thead>
             <tbody id="holdingsBody">
-              <tr><td colspan="4" style="color:#4b5563; text-align:center; padding:12px;">No positions yet</td></tr>
+              <tr><td colspan="4" style="color:var(--text-dim); text-align:center; padding:12px;">No positions yet</td></tr>
             </tbody>
           </table>
         </div>
@@ -693,7 +910,7 @@
         <div class="card">
           <h3>Transaction History</h3>
           <div class="tx-log" id="txLog">
-            <div style="color:#4b5563; text-align:center; padding:20px;">No transactions yet</div>
+            <div style="color:var(--text-dim); text-align:center; padding:20px;">No transactions yet</div>
           </div>
         </div>
       </div>
@@ -701,6 +918,83 @@
     </div>
   </div>
 
+</div>
+
+<!-- Documentation Modal -->
+<div id="docsModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>📚 Documentation</h2>
+      <button class="modal-close" onclick="closeDocs()" aria-label="Close documentation">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <h3>Getting Started</h3>
+      <p>The Stock Market Simulator lets you practise trading strategies without risking real money. Configure your simulation parameters, watch markets move in real time, and use the Auto-Trading Bot to automate strategies.</p>
+      <ol>
+        <li>Fill in the <strong>Simulation Setup</strong> fields and click <strong>Start Simulation</strong>.</li>
+        <li>Press <strong>▶ Play</strong> to run the simulation, or use <strong>Step →</strong> to advance one day at a time.</li>
+        <li>Watch the chart and portfolio update as each day passes.</li>
+        <li>Click <strong>↺ Reset</strong> at any time to return to the setup screen.</li>
+      </ol>
+
+      <h3>Simulation Setup</h3>
+      <table>
+        <thead><tr><th>Option</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Starting Capital</strong></td><td>The cash balance you begin with (default $10,000).</td></tr>
+          <tr><td><strong>Simulation Period</strong></td><td>Number of trading days to simulate (30 days – 5 years).</td></tr>
+          <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), or High Volatility.</td></tr>
+          <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (3, 5, or 8).</td></tr>
+          <tr><td><strong>Trading Cost</strong></td><td>Flat fee deducted from each buy or sell order (default $1.00).</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Chart &amp; Controls</h3>
+      <ul>
+        <li>Click a <strong>stock tab</strong> above the chart to switch between stocks.</li>
+        <li><strong>Hover</strong> over the chart to see the exact price and any trades on that day.</li>
+        <li>Green triangles (▲) mark <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
+        <li>Use the <strong>Speed</strong> slider to control simulation pace (1× – 10×).</li>
+      </ul>
+
+      <h3>Portfolio</h3>
+      <ul>
+        <li><strong>Cash</strong> – Your available buying power.</li>
+        <li><strong>Holdings Value</strong> – Current market value of all open positions.</li>
+        <li><strong>Total Value</strong> – Cash + Holdings Value.</li>
+        <li><strong>P&amp;L</strong> – Profit or loss relative to your starting capital.</li>
+      </ul>
+
+      <h3>Auto-Trading Bot</h3>
+      <p>Write a JavaScript snippet that runs automatically each simulation day. Enable or disable the bot with the <strong>Enable</strong> checkbox. Select a predefined strategy from the dropdown, or write your own.</p>
+
+      <h3>Bot API Reference</h3>
+      <table>
+        <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>prices</code></td><td>Object</td><td>Map of <code>{ symbol: currentPrice }</code> for all stocks.</td></tr>
+          <tr><td><code>holdings</code></td><td>Object</td><td>Map of <code>{ symbol: { shares, avgCost } }</code> for open positions.</td></tr>
+          <tr><td><code>cash</code></td><td>Number</td><td>Available cash at the start of the current day.</td></tr>
+          <tr><td><code>day</code></td><td>Number</td><td>Current simulation day (1-based).</td></tr>
+          <tr><td><code>totalDays</code></td><td>Number</td><td>Total number of days in the simulation.</td></tr>
+          <tr><td><code>buy(symbol, shares)</code></td><td>Function</td><td>Buy <em>shares</em> of <em>symbol</em> at today's price.</td></tr>
+          <tr><td><code>sell(symbol, shares)</code></td><td>Function</td><td>Sell <em>shares</em> of <em>symbol</em> at today's price.</td></tr>
+          <tr><td><code>priceHistory(symbol, n)</code></td><td>Function</td><td>Returns the last <em>n</em> closing prices (oldest first).</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Built-in Strategies</h3>
+      <ul>
+        <li><strong>SMA (Simple Moving Average)</strong> – Buys when price dips 3% below its 10-day average; sells when it rises 5% above.</li>
+        <li><strong>RSI</strong> – Buys when RSI &lt; 30 (oversold); sells when RSI &gt; 70 (overbought).</li>
+        <li><strong>Momentum</strong> – Buys top-performing stocks over 20 days; sells the worst performers.</li>
+        <li><strong>Buy &amp; Hold</strong> – Invests equally across all stocks on day 1 and never sells.</li>
+        <li><strong>Mean Reversion</strong> – Buys when a stock falls 5%+ below its 30-day average; sells on an 8%+ recovery.</li>
+      </ul>
+
+    </div>
+  </div>
 </div>
 
 <div id="notification"></div>
@@ -880,6 +1174,18 @@ function setActiveStock(symbol) {
 
 let chartTooltipDay = -1;
 
+function getThemeColors() {
+  const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  return {
+    grid:          isLight ? '#e5e7eb' : '#1f2437',
+    axisText:      isLight ? '#9ca3af' : '#6b7280',
+    tooltipBg:     isLight ? '#ffffff' : '#1e293b',
+    tooltipBorder: isLight ? '#d1d5db' : '#334155',
+    tooltipText:   isLight ? '#1f2937' : '#e0e0e0',
+    emptyText:     isLight ? '#9ca3af' : '#6b7280',
+  };
+}
+
 function renderChart() {
   const stock = stocks.find(s => s.symbol === activeStock);
   if (!stock) return;
@@ -901,10 +1207,11 @@ function renderChart() {
   const plotH = H - PAD.top  - PAD.bottom;
 
   ctx.clearRect(0, 0, W, H);
+  const tc = getThemeColors();
 
   const prices = stock.prices.slice(0, currentDay + 1);
   if (prices.length < 2) {
-    ctx.fillStyle = '#6b7280';
+    ctx.fillStyle = tc.emptyText;
     ctx.textAlign = 'center';
     ctx.font = '13px sans-serif';
     ctx.fillText('Advance the simulation to see price history', W / 2, H / 2);
@@ -922,10 +1229,10 @@ function renderChart() {
 
   // ── Grid lines + Y axis labels ──
   const yTicks = 5;
-  ctx.strokeStyle = '#1f2437';
+  ctx.strokeStyle = tc.grid;
   ctx.lineWidth = 1;
   ctx.font = '10px sans-serif';
-  ctx.fillStyle = '#6b7280';
+  ctx.fillStyle = tc.axisText;
   ctx.textAlign = 'right';
   for (let i = 0; i <= yTicks; i++) {
     const v = lo + (i / yTicks) * (hi - lo);
@@ -947,7 +1254,7 @@ function renderChart() {
     const dt = new Date(today);
     dt.setDate(today.getDate() + idx);
     const label = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-    ctx.fillStyle = '#6b7280';
+    ctx.fillStyle = tc.axisText;
     ctx.fillText(label, x, PAD.top + plotH + 18);
   }
 
@@ -1021,7 +1328,7 @@ function renderChart() {
     const ty = yOf(prices[ti]);
 
     ctx.beginPath();
-    ctx.strokeStyle = '#4b5563';
+    ctx.strokeStyle = tc.axisText;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
     ctx.moveTo(tx, PAD.top);
@@ -1048,13 +1355,13 @@ function renderChart() {
     let bx = tx + 10;
     if (bx + tw > W - 4) bx = tx - tw - 10;
     const by = Math.max(PAD.top, Math.min(ty - 14, PAD.top + plotH - 28));
-    ctx.fillStyle = '#1e293b';
-    ctx.strokeStyle = '#334155';
+    ctx.fillStyle = tc.tooltipBg;
+    ctx.strokeStyle = tc.tooltipBorder;
     ctx.lineWidth = 1;
     roundRect(ctx, bx, by, tw, 22, 4);
     ctx.fill();
     ctx.stroke();
-    ctx.fillStyle = '#e0e0e0';
+    ctx.fillStyle = tc.tooltipText;
     ctx.textAlign = 'left';
     ctx.fillText(tip, bx + 8, by + 15);
   }
@@ -1177,7 +1484,7 @@ function updatePortfolioUI() {
   const tbody = document.getElementById('holdingsBody');
   const symbols = Object.keys(holdings).filter(sym => holdings[sym].shares > 0);
   if (symbols.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="color:#4b5563; text-align:center; padding:12px;">No positions yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim); text-align:center; padding:12px;">No positions yet</td></tr>';
     return;
   }
   tbody.innerHTML = '';
@@ -1206,7 +1513,7 @@ function updatePortfolioUI() {
 function updateTxLog() {
   const log = document.getElementById('txLog');
   if (transactions.length === 0) {
-    log.innerHTML = '<div style="color:#4b5563; text-align:center; padding:20px;">No transactions yet</div>';
+    log.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding:20px;">No transactions yet</div>';
     return;
   }
   log.innerHTML = transactions.map(tx => `
@@ -1510,6 +1817,54 @@ function appendBotLog(msg) {
 
 // Initialise the script textarea with the default strategy
 document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
+
+// ──────────────────────────────────────────────
+// Theme (light / dark)
+// ──────────────────────────────────────────────
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const newTheme = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  html.setAttribute('data-theme', newTheme);
+  document.getElementById('themeToggle').textContent = newTheme === 'light' ? '🌙' : '☀️';
+  localStorage.setItem('theme', newTheme);
+  if (stocks.length > 0) renderChart();
+}
+
+// Apply saved or preferred theme on load
+(function () {
+  const saved = localStorage.getItem('theme');
+  let preferred = 'dark';
+  if (saved) {
+    preferred = saved;
+  } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+    preferred = 'light';
+  }
+  document.documentElement.setAttribute('data-theme', preferred);
+  document.getElementById('themeToggle').textContent = preferred === 'light' ? '🌙' : '☀️';
+}());
+
+// ──────────────────────────────────────────────
+// Documentation Modal
+// ──────────────────────────────────────────────
+
+function openDocs() {
+  document.getElementById('docsModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDocs() {
+  document.getElementById('docsModal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+document.getElementById('docsModal').addEventListener('click', function (e) {
+  if (e.target === this) closeDocs();
+});
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && !document.getElementById('docsModal').classList.contains('hidden')) closeDocs();
+});
 </script>
 </body>
 </html>
