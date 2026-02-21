@@ -797,6 +797,89 @@
       .modal-header { padding: 16px 16px 12px; }
       .modal-body { padding: 16px; }
     }
+
+    /* ── Landing page ── */
+    .landing {
+      max-width: 860px;
+      margin: 48px auto;
+      padding: 0 16px;
+      text-align: center;
+    }
+
+    .landing-hero {
+      margin-bottom: 48px;
+    }
+
+    .landing-hero h2 {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-heading);
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+
+    .landing-hero p {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 28px;
+      line-height: 1.6;
+    }
+
+    .btn-lg {
+      padding: 14px 36px;
+      font-size: 1rem;
+      border-radius: 10px;
+    }
+
+    .landing-steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 20px;
+      text-align: left;
+      margin-bottom: 40px;
+    }
+
+    .step-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 20px;
+    }
+
+    .step-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+
+    .step-card h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-heading);
+      margin-bottom: 8px;
+    }
+
+    .step-card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .landing-note {
+      font-size: 0.8rem;
+      color: var(--text-faint);
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -812,8 +895,49 @@
 
 <div class="container">
 
+  <!-- Landing Page -->
+  <div id="landingPage">
+    <div class="landing">
+      <div class="landing-hero">
+        <h2>Practice Trading Without Any Risk</h2>
+        <p>Configure a virtual stock market, watch prices move in real time, and test automated strategies — all in your browser with no sign-up required.</p>
+        <button class="btn btn-primary btn-lg" onclick="showSetup()">Get Started →</button>
+      </div>
+
+      <div class="landing-steps">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h3>Configure</h3>
+          <p>Set your starting capital, number of stocks, simulation period, trading cost, and market condition.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h3>Start the Simulation</h3>
+          <p>Click <strong>Start Simulation</strong>, then press <strong>▶ Play</strong> to run continuously or <strong>Step →</strong> to advance one day at a time.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h3>Trade</h3>
+          <p>Buy and sell shares manually using the trade form, or enable the Auto-Trading Bot to execute a strategy for you.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">4</div>
+          <h3>Monitor</h3>
+          <p>Watch the live chart, portfolio dashboard, and transaction log update as each simulated day passes.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-number">5</div>
+          <h3>Review &amp; Reset</h3>
+          <p>Analyse your results at the end of the period, then click <strong>↺ Reset</strong> to try a new strategy.</p>
+        </div>
+      </div>
+
+      <p class="landing-note">No installation required — runs entirely in your browser. Click <strong>📖 Docs</strong> in the header for full documentation.</p>
+    </div>
+  </div>
+
   <!-- Setup Panel -->
-  <div class="setup-panel" id="setupPanel">
+  <div class="setup-panel hidden" id="setupPanel">
     <h2>Simulation Setup</h2>
     <div class="setup-grid">
       <div class="field">
@@ -1273,10 +1397,16 @@ function resetSimulation() {
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
   isPlaying = false;
   document.getElementById('simArea').classList.add('hidden');
-  document.getElementById('setupPanel').classList.remove('hidden');
+  document.getElementById('setupPanel').classList.add('hidden');
+  document.getElementById('landingPage').classList.remove('hidden');
   const canvas = document.getElementById('priceChart');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function showSetup() {
+  document.getElementById('landingPage').classList.add('hidden');
+  document.getElementById('setupPanel').classList.remove('hidden');
 }
 
 // ──────────────────────────────────────────────
