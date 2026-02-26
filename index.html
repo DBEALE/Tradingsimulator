@@ -1108,6 +1108,7 @@
               <option value="momentum">Momentum</option>
               <option value="buyhold">Buy &amp; Hold</option>
               <option value="meanreversion">Mean Reversion</option>
+              <option value="graduateddca">Graduated DCA</option>
             </select>
           </div>
           <textarea class="bot-script" id="botScript" spellcheck="false"></textarea>
@@ -2210,6 +2211,56 @@ for (const symbol of Object.keys(prices)) {
     if (maxShares > 0) buy(symbol, maxShares);
   } else if (deviation > 0.08 && owned > 0) {
     sell(symbol, owned);
+  }
+}`,
+
+  graduateddca:
+`// Graduated DCA: On day 1, invest equally across all stocks.
+// Then manage positions relative to average cost:
+// 📉 -15%: Add 10% of cash | -25%: Add 25% of cash
+// 📈 +25%: Sell 10% | +35%: Sell 20% | +45%: Sell 30% | +60%: Sell 40% | +100%: Sell all
+
+if (day === 1) {
+  const symbols = Object.keys(prices);
+  const perStock = cash / symbols.length;
+  for (const symbol of symbols) {
+    const shares = Math.floor(perStock / prices[symbol]);
+    if (shares > 0) buy(symbol, shares);
+  }
+} else {
+  for (const symbol of Object.keys(prices)) {
+    const owned = holdings[symbol] ? holdings[symbol].shares : 0;
+    if (owned === 0) continue;
+    const avgCost = holdings[symbol].avgCost;
+    const change = (prices[symbol] - avgCost) / avgCost;
+    if (change <= -0.25) {
+      // Drop 25%+ → Add 25% of cash
+      const shares = Math.floor(cash * 0.25 / prices[symbol]);
+      if (shares > 0) buy(symbol, shares);
+    } else if (change <= -0.15) {
+      // Drop 15–25% → Add 10% of cash
+      const shares = Math.floor(cash * 0.10 / prices[symbol]);
+      if (shares > 0) buy(symbol, shares);
+    } else if (change >= 1.00) {
+      // Rise 100%+ → Sell all
+      sell(symbol, owned);
+    } else if (change >= 0.60) {
+      // Rise 60–100% → Sell 40%
+      const shares = Math.floor(owned * 0.40);
+      if (shares > 0) sell(symbol, shares);
+    } else if (change >= 0.45) {
+      // Rise 45–60% → Sell 30%
+      const shares = Math.floor(owned * 0.30);
+      if (shares > 0) sell(symbol, shares);
+    } else if (change >= 0.35) {
+      // Rise 35–45% → Sell 20%
+      const shares = Math.floor(owned * 0.20);
+      if (shares > 0) sell(symbol, shares);
+    } else if (change >= 0.25) {
+      // Rise 25–35% → Sell 10%
+      const shares = Math.floor(owned * 0.10);
+      if (shares > 0) sell(symbol, shares);
+    }
   }
 }`
 };
