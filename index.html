@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Stock Market Simulator</title>
-  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <style>
     /* ── CSS Variables (dark theme defaults) ── */
     :root {
@@ -622,71 +621,7 @@
     /* ── Horizontal-scroll wrapper for wide tables on mobile ── */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-    /* ── Email Notifications ── */
-    .email-section {
-      border-top: 1px solid var(--border);
-      margin-top: 20px;
-      padding-top: 20px;
-    }
-
-    .email-section h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      margin-bottom: 14px;
-    }
-
-    .email-optional {
-      font-size: 0.75rem;
-      font-weight: 400;
-      text-transform: none;
-      letter-spacing: 0;
-      color: var(--text-faint);
-    }
-
-    .email-config-toggle {
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      cursor: pointer;
-      background: none;
-      border: none;
-      padding: 6px 0;
-      text-decoration: underline;
-      margin-top: 4px;
-      display: inline-block;
-    }
-
-    .email-config-toggle:hover { color: var(--text); }
-
-    .email-config-panel {
-      background: var(--bg-inner);
-      border: 1px solid var(--border-inner);
-      border-radius: 8px;
-      padding: 14px;
-      margin-top: 10px;
-    }
-
-    .email-config-panel p {
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      margin-bottom: 12px;
-      line-height: 1.6;
-    }
-
-    .email-config-panel a { color: #2563eb; }
-    .email-config-panel a:hover { text-decoration: underline; }
-
-    .email-status {
-      font-size: 0.78rem;
-      color: var(--text-faint);
-      margin-top: 6px;
-    }
-
-    .email-status.configured { color: #22c55e; }
-
-    /* ── Documentation Modal ── */
+        /* ── Documentation Modal ── */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -880,6 +815,184 @@
       color: var(--text-faint);
       margin-top: 8px;
     }
+
+    /* ── P&L prominent ── */
+    .stat-box.pnl-box {
+      grid-column: 1 / -1;
+    }
+
+    .stat-box.pnl-box .label {
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .stat-box.pnl-box .value {
+      font-size: 1.8rem;
+    }
+
+    /* ── Scrollable stock tabs for many stocks ── */
+    .stock-tabs {
+      max-height: 140px;
+      overflow-y: auto;
+    }
+
+    .stock-tabs-controls {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .stock-tabs-controls .btn {
+      padding: 4px 12px;
+      font-size: 0.75rem;
+    }
+
+    /* ── Disabled bot controls ── */
+    .bot-script:disabled,
+    #botStrategySelect:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .bot-locked-notice {
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      font-style: italic;
+      margin-top: 4px;
+    }
+
+    /* ── Completion Modal ── */
+    .completion-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 3000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    .completion-modal-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 520px;
+      box-shadow: 0 24px 48px rgba(0,0,0,0.5);
+    }
+
+    .completion-modal-header {
+      padding: 20px 24px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .completion-modal-header h2 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .completion-modal-body {
+      padding: 20px 24px;
+    }
+
+    .completion-stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .completion-stat {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .completion-stat .c-label {
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      margin-bottom: 4px;
+    }
+
+    .completion-stat .c-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .completion-stat .c-value.up   { color: #22c55e; }
+    .completion-stat .c-value.down { color: #ef4444; }
+
+    .completion-return-box {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .completion-return-box .ret-label {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .completion-return-box .ret-value {
+      font-size: 2.2rem;
+      font-weight: 800;
+    }
+
+    .completion-return-box .ret-value.up   { color: #22c55e; }
+    .completion-return-box .ret-value.down { color: #ef4444; }
+
+    .completion-stock-rows {
+      font-size: 0.8rem;
+      margin-bottom: 16px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .completion-stock-rows table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .completion-stock-rows th {
+      text-align: left;
+      padding: 4px 6px;
+      color: var(--text-faint);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .completion-stock-rows td {
+      padding: 5px 6px;
+      border-bottom: 1px solid var(--border-inner);
+      color: var(--text);
+    }
+
+    .completion-footer {
+      display: flex;
+      gap: 10px;
+      padding: 0 24px 20px;
+    }
+
+    .completion-footer .btn { flex: 1; }
+
+    @media (max-width: 500px) {
+      .completion-stat-grid { grid-template-columns: 1fr; }
+      .completion-footer { padding: 0 16px 16px; }
+      .completion-modal-body { padding: 16px; }
+    }
   </style>
 </head>
 <body>
@@ -908,7 +1021,7 @@
         <div class="step-card">
           <div class="step-number">1</div>
           <h3>Configure</h3>
-          <p>Set your starting capital, number of stocks, simulation period, trading cost, and market condition.</p>
+          <p>Choose your starting capital, simulation period, market condition (including dot-com, financial crisis, or COVID scenarios), number of stocks (1, 5, 10, 25, or 100), and a $5 default trading cost.</p>
         </div>
         <div class="step-card">
           <div class="step-number">2</div>
@@ -918,17 +1031,17 @@
         <div class="step-card">
           <div class="step-number">3</div>
           <h3>Trade</h3>
-          <p>Buy and sell shares manually using the trade form, or enable the Auto-Trading Bot to execute a strategy for you.</p>
+          <p>Use the <strong>All</strong> / <strong>None</strong> buttons to toggle stock visibility. The Auto-Trading Bot executes a strategy automatically &mdash; configure it before starting the simulation.</p>
         </div>
         <div class="step-card">
           <div class="step-number">4</div>
           <h3>Monitor</h3>
-          <p>Watch the live chart, portfolio dashboard, and transaction log update as each simulated day passes.</p>
+          <p>Watch the live chart, portfolio dashboard (with prominent P&amp;L display), and transaction log update as each simulated day passes.</p>
         </div>
         <div class="step-card">
           <div class="step-number">5</div>
           <h3>Review &amp; Reset</h3>
-          <p>Analyse your results at the end of the period, then click <strong>↺ Reset</strong> to try a new strategy.</p>
+          <p>When the simulation ends, a <strong>summary popup</strong> shows your total return, final portfolio value, and stock performance. Click <strong>&#8635; Reset</strong> to try a new strategy.</p>
         </div>
       </div>
 
@@ -962,19 +1075,24 @@
           <option value="neutral" selected>Neutral (random walk)</option>
           <option value="bear">Bear Market (trending down)</option>
           <option value="volatile">High Volatility</option>
+          <option value="dotcom">Dot-com Boom &amp; Bust</option>
+          <option value="financial">2008 Financial Crisis</option>
+          <option value="covid">COVID Crash &amp; Recovery</option>
         </select>
       </div>
       <div class="field">
         <label>Number of Stocks</label>
         <select id="numStocks">
-          <option value="3">3 Stocks</option>
+          <option value="1">1 Stock</option>
           <option value="5" selected>5 Stocks</option>
-          <option value="8">8 Stocks</option>
+          <option value="10">10 Stocks</option>
+          <option value="25">25 Stocks</option>
+          <option value="100">100 Stocks</option>
         </select>
       </div>
       <div class="field">
         <label>Trading Cost per Order ($)</label>
-        <input type="number" id="tradingCostInput" value="1.00" min="0" step="0.01" />
+        <input type="number" id="tradingCostInput" value="5.00" min="0" step="0.01" />
       </div>
       <div class="field">
         <label>&nbsp;</label>
@@ -982,53 +1100,6 @@
       </div>
     </div>
 
-    <!-- Email Notifications (optional) -->
-    <div class="email-section">
-      <h2>Email Notifications <span class="email-optional">— optional</span></h2>
-      <div class="setup-grid">
-        <div class="field">
-          <label>Your Email Address</label>
-          <input type="email" id="notifyEmail" placeholder="you@example.com" oninput="saveEmailLocal()" />
-        </div>
-        <div class="field">
-          <label>Send Updates</label>
-          <select id="notifyFrequency" onchange="saveEmailLocal()">
-            <option value="0">On completion only</option>
-            <option value="30" selected>Every 30 sim-days</option>
-            <option value="60">Every 60 sim-days</option>
-            <option value="90">Every 90 sim-days</option>
-          </select>
-        </div>
-      </div>
-      <button class="email-config-toggle" onclick="toggleEmailConfig()" id="emailConfigToggle" aria-expanded="false" aria-controls="emailConfigPanel">⚙ Configure Email Service ▾</button>
-      <div class="email-config-panel hidden" id="emailConfigPanel">
-        <p>
-          Email delivery is powered by <a href="https://www.emailjs.com" target="_blank" rel="noopener noreferrer">EmailJS</a>
-          (free, no backend required). Create a free account, connect an email service, and create a template with
-          variables <code>to_email</code>, <code>subject</code>, and <code>message</code>.
-          Then paste your IDs below.
-        </p>
-        <div class="setup-grid">
-          <div class="field">
-            <label>Service ID</label>
-            <input type="text" id="ejsServiceId" placeholder="service_xxxxxxx" />
-          </div>
-          <div class="field">
-            <label>Template ID</label>
-            <input type="text" id="ejsTemplateId" placeholder="template_xxxxxxx" />
-          </div>
-          <div class="field">
-            <label>Public Key</label>
-            <input type="text" id="ejsPublicKey" placeholder="xxxxxxxxxxxx" />
-          </div>
-          <div class="field">
-            <label>&nbsp;</label>
-            <button class="btn btn-secondary" onclick="saveEmailConfig()" style="width:100%;">Save Config</button>
-          </div>
-        </div>
-        <div class="email-status" id="emailStatus">Not configured</div>
-      </div>
-    </div>
   </div>
 
   <!-- Simulator (hidden until started) -->
@@ -1039,6 +1110,10 @@
       <!-- Left: Chart -->
       <div>
         <div class="card" style="margin-bottom:20px;">
+          <div class="stock-tabs-controls" id="stockTabsControls" style="display:none;">
+            <button class="btn btn-secondary" onclick="selectAllStocks()">All</button>
+            <button class="btn btn-secondary" onclick="selectNoneStocks()">None</button>
+          </div>
           <div class="stock-tabs" id="stockTabs"></div>
 
           <div class="price-header">
@@ -1133,8 +1208,8 @@
               <div class="label">Total Value</div>
               <div class="value" id="totalValue">$0.00</div>
             </div>
-            <div class="stat-box">
-              <div class="label">P&amp;L</div>
+            <div class="stat-box pnl-box">
+              <div class="label">P&amp;L (Profit / Loss)</div>
               <div class="value" id="pnlValue">$0.00</div>
             </div>
           </div>
@@ -1192,15 +1267,15 @@
         <tbody>
           <tr><td><strong>Starting Capital</strong></td><td>The cash balance you begin with (default $10,000).</td></tr>
           <tr><td><strong>Simulation Period</strong></td><td>Number of trading days to simulate (30 days – 5 years).</td></tr>
-          <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), or High Volatility.</td></tr>
-          <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (3, 5, or 8).</td></tr>
-          <tr><td><strong>Trading Cost</strong></td><td>Flat fee deducted from each buy or sell order (default $1.00).</td></tr>
+          <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), High Volatility, Dot-com Boom &amp; Bust, 2008 Financial Crisis, or COVID Crash &amp; Recovery.</td></tr>
+          <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (1, 5, 10, 25, or 100).</td></tr>
+          <tr><td><strong>Trading Cost</strong></td><td>Flat fee deducted from each buy or sell order (default $5.00).</td></tr>
         </tbody>
       </table>
 
       <h3>Chart &amp; Controls</h3>
       <ul>
-        <li>Click a <strong>stock tab</strong> above the chart to toggle that stock on or off; multiple stocks can be displayed at once.</li>
+        <li>Use the <strong>All</strong> and <strong>None</strong> buttons to select or deselect all stocks at once, or click individual stock tabs to toggle.</li>
         <li><strong>Hover</strong> over the chart to see the exact price and any trades on that day.</li>
         <li>Green triangles (▲) mark <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
         <li>Use the <strong>Speed</strong> slider to control simulation pace (1× – 10×).</li>
@@ -1245,6 +1320,47 @@
   </div>
 </div>
 
+<!-- Simulation Complete Modal -->
+<div id="completionModal" class="completion-modal-overlay hidden">
+  <div class="completion-modal-box">
+    <div class="completion-modal-header">
+      <h2>&#127937; Simulation Complete</h2>
+      <button class="modal-close" onclick="closeCompletionModal()" aria-label="Close">&#10005;</button>
+    </div>
+    <div class="completion-modal-body">
+      <div class="completion-return-box">
+        <div class="ret-label">Total Return</div>
+        <div class="ret-value" id="cmReturnValue">+$0.00</div>
+        <div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;" id="cmReturnPct">+0.00%</div>
+      </div>
+      <div class="completion-stat-grid">
+        <div class="completion-stat">
+          <div class="c-label">Starting Capital</div>
+          <div class="c-value" id="cmStartCapital">$0.00</div>
+        </div>
+        <div class="completion-stat">
+          <div class="c-label">Final Value</div>
+          <div class="c-value" id="cmFinalValue">$0.00</div>
+        </div>
+        <div class="completion-stat">
+          <div class="c-label">Cash Remaining</div>
+          <div class="c-value" id="cmCash">$0.00</div>
+        </div>
+        <div class="completion-stat">
+          <div class="c-label">Total Transactions</div>
+          <div class="c-value" id="cmTransactions">0</div>
+        </div>
+      </div>
+      <div class="completion-stock-rows" id="cmStockRows"></div>
+    </div>
+    <div class="completion-footer">
+      <button class="btn btn-primary" onclick="closeCompletionModal(); resetSimulation();">&#8635; Reset &amp; Try Again</button>
+      <button class="btn btn-secondary" onclick="closeCompletionModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+
 <div id="notification"></div>
 
 <script>
@@ -1256,7 +1372,7 @@ let currentDay = 0;
 let totalDays = 365;
 let startingCapital = 10000;
 let cash = 10000;
-let tradingCost = 1.0;   // flat fee per order
+let tradingCost = 5.0;   // flat fee per order
 let holdings = {};   // { symbol: { shares: number, totalCost: number } }
 let transactions = [];
 let playInterval = null;
@@ -1265,28 +1381,82 @@ let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
 
-// Email notification state
-let notifyEmail = '';
-let notifyFrequency = 30;  // simulation days between emails (0 = completion only)
-let lastNotifyDay = -1;
-let emailjsConfigured = false;
-
 const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
 
 const STOCK_TEMPLATES = [
-  { name: 'AlphaTech',  symbol: 'ATEC', basePrice: 150, volatility: 0.018, drift: 0.0003 },
-  { name: 'BlueSky',    symbol: 'BSKY', basePrice: 80,  volatility: 0.022, drift: 0.0002 },
-  { name: 'CoreEnergy', symbol: 'CREN', basePrice: 45,  volatility: 0.015, drift: 0.0001 },
-  { name: 'DeltaFin',   symbol: 'DLTF', basePrice: 210, volatility: 0.012, drift: 0.0004 },
-  { name: 'EchoNet',    symbol: 'ECHO', basePrice: 30,  volatility: 0.030, drift: -0.0001 },
-  { name: 'FusionLabs', symbol: 'FUSN', basePrice: 95,  volatility: 0.025, drift: 0.0002 },
-  { name: 'GreenWave',  symbol: 'GRNW', basePrice: 60,  volatility: 0.020, drift: 0.0003 },
-  { name: 'HorizonMed', symbol: 'HRZM', basePrice: 120, volatility: 0.016, drift: 0.0002 },
+  { name: 'AlphaTech',   symbol: 'ATEC', basePrice: 150, volatility: 0.018, drift: 0.0003 },
+  { name: 'BlueSky',     symbol: 'BSKY', basePrice: 80,  volatility: 0.022, drift: 0.0002 },
+  { name: 'CoreEnergy',  symbol: 'CREN', basePrice: 45,  volatility: 0.015, drift: 0.0001 },
+  { name: 'DeltaFin',    symbol: 'DLTF', basePrice: 210, volatility: 0.012, drift: 0.0004 },
+  { name: 'EchoNet',     symbol: 'ECHO', basePrice: 30,  volatility: 0.030, drift: -0.0001 },
+  { name: 'FusionLabs',  symbol: 'FUSN', basePrice: 95,  volatility: 0.025, drift: 0.0002 },
+  { name: 'GreenWave',   symbol: 'GRNW', basePrice: 60,  volatility: 0.020, drift: 0.0003 },
+  { name: 'HorizonMed',  symbol: 'HRZM', basePrice: 120, volatility: 0.016, drift: 0.0002 },
+  { name: 'IronShield',  symbol: 'IRNS', basePrice: 75,  volatility: 0.019, drift: 0.0002 },
+  { name: 'JetStream',   symbol: 'JETS', basePrice: 180, volatility: 0.021, drift: 0.0001 },
+  { name: 'KryptoVault', symbol: 'KRYP', basePrice: 55,  volatility: 0.035, drift: 0.0005 },
+  { name: 'LunaPharm',   symbol: 'LUNA', basePrice: 95,  volatility: 0.017, drift: 0.0003 },
+  { name: 'MegaStore',   symbol: 'MGST', basePrice: 140, volatility: 0.014, drift: 0.0002 },
+  { name: 'NanoTech',    symbol: 'NANO', basePrice: 65,  volatility: 0.028, drift: 0.0004 },
+  { name: 'OmegaOil',    symbol: 'OMGO', basePrice: 50,  volatility: 0.023, drift: 0.0000 },
+  { name: 'PolarAir',    symbol: 'POLR', basePrice: 88,  volatility: 0.019, drift: 0.0002 },
+  { name: 'QuantumCore', symbol: 'QNTM', basePrice: 200, volatility: 0.024, drift: 0.0003 },
+  { name: 'RedRock',     symbol: 'RDRK', basePrice: 35,  volatility: 0.026, drift: 0.0001 },
+  { name: 'SilverPath',  symbol: 'SLVP', basePrice: 110, volatility: 0.015, drift: 0.0002 },
+  { name: 'TitanBank',   symbol: 'TTNB', basePrice: 165, volatility: 0.013, drift: 0.0003 },
+  { name: 'UltraGrid',   symbol: 'ULTG', basePrice: 72,  volatility: 0.020, drift: 0.0002 },
+  { name: 'VortexSys',   symbol: 'VRTX', basePrice: 130, volatility: 0.022, drift: 0.0001 },
+  { name: 'WarpDrive',   symbol: 'WRPD', basePrice: 48,  volatility: 0.031, drift: 0.0004 },
+  { name: 'XcelBio',     symbol: 'XCLB', basePrice: 82,  volatility: 0.027, drift: 0.0002 },
+  { name: 'YieldMax',    symbol: 'YLDM', basePrice: 156, volatility: 0.016, drift: 0.0003 },
 ];
+
+/**
+ * Returns a pool of n stock configurations. For n > STOCK_TEMPLATES.length,
+ * additional stocks are generated deterministically from sector/name patterns.
+ */
+function buildStockPool(n) {
+  const base = [...STOCK_TEMPLATES];
+  if (n <= base.length) return base.slice(0, n);
+
+  const pool = [...base];
+  const sectors    = ['Tech','Finance','Energy','Health','Retail','Auto','Media','Mining','Pharma','Cyber'];
+  const basePrices = [18,24,32,48,56,72,88,95,105,120,135,145,160,175,190,210,225,240,15,28,42,68,85,115,170];
+  const vols       = [0.013,0.016,0.018,0.020,0.022,0.025,0.028,0.031,0.015,0.019,0.021,0.024,0.027,0.030,0.012,0.017,0.023,0.026,0.014,0.029,0.032,0.011,0.033,0.025,0.020];
+  const drifts     = [0.0001,0.0002,0.0003,0.0004,-0.0001,0.0000,0.0002,0.0003,0.0001,0.0004,0.0002,0.0003,0.0001,0.0000,0.0002,0.0004,-0.0001,0.0003,0.0002,0.0001,0.0005,-0.0002,0.0003,0.0002,0.0001];
+  const AB = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  const usedSymbols = new Set(base.map(t => t.symbol));
+  let i = 0;
+  while (pool.length < n) {
+    const sector = sectors[i % sectors.length];
+    const a = AB[Math.floor(i / 26) % 26];
+    const b = AB[i % 26];
+    // Use zero-padded index for guaranteed uniqueness (e.g. AA01, AA02 ... AA99)
+    const sym = a + b + String(i + 1).padStart(2, '0');
+    if (!usedSymbols.has(sym)) {
+      usedSymbols.add(sym);
+      pool.push({
+        name:       sector + ' ' + a + b,
+        symbol:     sym,
+        basePrice:  basePrices[i % basePrices.length],
+        volatility: vols[i % vols.length],
+        drift:      drifts[i % drifts.length],
+      });
+    }
+    i++;
+  }
+  return pool.slice(0, n);
+}
 
 const CHART_COLORS = [
   '#2563eb', '#22c55e', '#f59e0b', '#ef4444',
-  '#a855f7', '#06b6d4', '#ec4899', '#84cc16'
+  '#a855f7', '#06b6d4', '#ec4899', '#84cc16',
+  '#fb923c', '#14b8a6', '#f472b6', '#a3e635',
+  '#60a5fa', '#34d399', '#fbbf24', '#f87171',
+  '#c084fc', '#38bdf8', '#fb7185', '#bef264',
+  '#fdba74', '#2dd4bf', '#e879f9', '#d9f99d',
+  '#93c5fd', '#6ee7b7', '#fde68a', '#fca5a5',
 ];
 
 // ──────────────────────────────────────────────
@@ -1306,28 +1476,56 @@ function randn() {
 /**
  * Generate full price series for a stock using Geometric Brownian Motion
  */
-function generatePriceSeries(template, days, marketDrift, marketVolMult) {
+function generatePriceSeries(template, days, marketDrift, marketVolMult, phases) {
   const prices = [template.basePrice];
-  const drift = template.drift + marketDrift;
-  const vol = template.volatility * marketVolMult;
 
-  for (let d = 1; d <= days; d++) {
-    const prev = prices[d - 1];
-    // GBM daily step
-    const shock = vol * randn();
-    const dailyReturn = drift + shock;
-    const next = Math.max(MIN_STOCK_PRICE, prev * (1 + dailyReturn));
-    prices.push(+next.toFixed(2));
+  if (phases) {
+    // Phase-based GBM for historical scenario conditions
+    for (let d = 1; d <= days; d++) {
+      const frac  = d / days;
+      const phase = phases.find(p => frac <= p.endFrac) || phases[phases.length - 1];
+      const drift = template.drift + phase.drift;
+      const vol   = template.volatility * phase.volMult;
+      const prev  = prices[d - 1];
+      const next  = Math.max(MIN_STOCK_PRICE, prev * (1 + drift + vol * randn()));
+      prices.push(+next.toFixed(2));
+    }
+  } else {
+    // Standard GBM
+    const drift = template.drift + marketDrift;
+    const vol   = template.volatility * marketVolMult;
+    for (let d = 1; d <= days; d++) {
+      const prev = prices[d - 1];
+      const next = Math.max(MIN_STOCK_PRICE, prev * (1 + drift + vol * randn()));
+      prices.push(+next.toFixed(2));
+    }
   }
   return prices;
 }
 
 function getMarketParams(condition) {
   switch (condition) {
-    case 'bull':     return { drift: 0.0005, volMult: 1.0 };
-    case 'bear':     return { drift: -0.0005, volMult: 1.1 };
-    case 'volatile': return { drift: 0.0001, volMult: 2.5 };
-    default:         return { drift: 0.0001, volMult: 1.0 };
+    case 'bull':      return { drift: 0.0005, volMult: 1.0 };
+    case 'bear':      return { drift: -0.0005, volMult: 1.1 };
+    case 'volatile':  return { drift: 0.0001, volMult: 2.5 };
+    // Dot-com: ~60% boom, then severe bust
+    case 'dotcom':    return { phases: [
+      { endFrac: 0.60, drift:  0.0015, volMult: 1.6 },
+      { endFrac: 1.00, drift: -0.0020, volMult: 2.2 },
+    ]};
+    // 2008 Financial Crisis: calm start, severe crisis, slow recovery
+    case 'financial': return { phases: [
+      { endFrac: 0.30, drift:  0.0003, volMult: 1.0 },
+      { endFrac: 0.60, drift: -0.0022, volMult: 2.8 },
+      { endFrac: 1.00, drift:  0.0008, volMult: 1.6 },
+    ]};
+    // COVID: pre-crash bull, sharp crash, strong recovery
+    case 'covid':     return { phases: [
+      { endFrac: 0.35, drift:  0.0005, volMult: 1.0 },
+      { endFrac: 0.50, drift: -0.0055, volMult: 4.0 },
+      { endFrac: 1.00, drift:  0.0018, volMult: 1.8 },
+    ]};
+    default:          return { drift: 0.0001, volMult: 1.0 };
   }
 }
 
@@ -1341,10 +1539,11 @@ function startSimulation() {
   tradingCost = parseFloat(document.getElementById('tradingCostInput').value) || 0;
   const condition = document.getElementById('marketCondition').value;
   const numStocks = parseInt(document.getElementById('numStocks').value);
-  const { drift, volMult } = getMarketParams(condition);
+  const marketParams = getMarketParams(condition);
+  const { drift = 0, volMult = 1, phases } = marketParams;
 
-  // Fisher-Yates shuffle for uniform randomness, then pick numStocks
-  const arr = [...STOCK_TEMPLATES];
+  // Build full pool, shuffle, pick numStocks
+  const arr = buildStockPool(numStocks);
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -1354,7 +1553,7 @@ function startSimulation() {
   stocks = templates.map((t, i) => ({
     ...t,
     color: CHART_COLORS[i % CHART_COLORS.length],
-    prices: generatePriceSeries(t, totalDays, drift, volMult),
+    prices: generatePriceSeries(t, totalDays, drift, volMult, phases),
   }));
 
   cash = startingCapital;
@@ -1362,11 +1561,6 @@ function startSimulation() {
   transactions = [];
   currentDay = 0;
   isPlaying = false;
-  lastNotifyDay = 0;
-
-  // Read email notification settings
-  notifyEmail = document.getElementById('notifyEmail').value.trim();
-  notifyFrequency = parseInt(document.getElementById('notifyFrequency').value, 10);
 
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
 
@@ -1380,8 +1574,8 @@ function startSimulation() {
   updateTxLog();
   updateMarketTable();
 
-  document.getElementById('playPauseBtn').textContent = '▶ Play';
-  document.getElementById('dayDisplay').textContent = `Day 0 / ${totalDays}`;
+  document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
+  document.getElementById('dayDisplay').textContent = 'Day 0 / ' + totalDays;
 
   const botLogEl = document.getElementById('botLog');
   botLogEl.innerHTML = '';
@@ -1391,7 +1585,8 @@ function startSimulation() {
   botCheckbox.checked = true;
   botEnabled = true;
 
-  sendSimulationEmail('start');
+  // Lock bot controls once simulation has started
+  lockBotUI();
 }
 
 function resetSimulation() {
@@ -1403,6 +1598,8 @@ function resetSimulation() {
   const canvas = document.getElementById('priceChart');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  closeCompletionModal();
+  unlockBotUI();
 }
 
 function showSetup() {
@@ -1421,10 +1618,13 @@ function buildStockTabs() {
     const btn = document.createElement('button');
     btn.className = 'tab-btn';
     btn.dataset.symbol = s.symbol;
-    btn.innerHTML = `<span class="tab-dot" style="background:${s.color}"></span>${s.symbol}`;
+    btn.innerHTML = '<span class="tab-dot" style="background:' + s.color + '"></span>' + s.symbol;
     btn.onclick = () => toggleStockVisibility(s.symbol);
     tabs.appendChild(btn);
   });
+  // Show All/None controls when there are multiple stocks
+  const controls = document.getElementById('stockTabsControls');
+  controls.style.display = stocks.length > 1 ? 'flex' : 'none';
 }
 
 function toggleStockVisibility(symbol) {
@@ -1439,6 +1639,28 @@ function toggleStockVisibility(symbol) {
   } else {
     visibleStocks.add(symbol);
     activeStock = symbol;
+  }
+  updateTabStyles();
+  renderChart();
+  updatePriceHeader();
+}
+
+function selectAllStocks() {
+  stocks.forEach(s => visibleStocks.add(s.symbol));
+  if (stocks.length > 0 && !visibleStocks.has(activeStock)) {
+    activeStock = stocks[0].symbol;
+  }
+  updateTabStyles();
+  renderChart();
+  updatePriceHeader();
+}
+
+function selectNoneStocks() {
+  // Cannot have zero visible stocks; keep only the active one
+  const keepSymbol = activeStock || (stocks[0] && stocks[0].symbol);
+  if (keepSymbol) {
+    visibleStocks = new Set([keepSymbol]);
+    activeStock = keepSymbol;
   }
   updateTabStyles();
   renderChart();
@@ -1886,7 +2108,7 @@ function updateTxLog() {
 
 function togglePlayPause() {
   if (currentDay >= totalDays) {
-    showNotification('Simulation complete! Reset to start again.');
+    showCompletionModal();
     return;
   }
   isPlaying = !isPlaying;
@@ -1902,27 +2124,24 @@ function tick() {
   if (currentDay >= totalDays) {
     clearInterval(playInterval);
     isPlaying = false;
-    document.getElementById('playPauseBtn').textContent = '▶ Play';
-    showNotification('🏁 Simulation complete!');
-    sendSimulationEmail('complete');
+    document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
+    showCompletionModal();
     return;
   }
   currentDay++;
   updateDay();
   if (botEnabled) runTradingScript();
-  checkEmailNotification();
 }
 
 function stepForward() {
   if (currentDay >= totalDays) {
-    showNotification('Simulation complete! Reset to start again.');
+    showCompletionModal();
     return;
   }
   currentDay++;
   updateDay();
   if (botEnabled) runTradingScript();
-  checkEmailNotification();
-  if (currentDay >= totalDays) sendSimulationEmail('complete');
+  if (currentDay >= totalDays) showCompletionModal();
 }
 
 function updateDay() {
@@ -1956,156 +2175,114 @@ function showNotification(msg) {
 }
 
 // ──────────────────────────────────────────────
-// Email Notifications
+// Completion Modal
 // ──────────────────────────────────────────────
 
-function toggleEmailConfig() {
-  const panel = document.getElementById('emailConfigPanel');
-  const btn = document.getElementById('emailConfigToggle');
-  const isHidden = panel.classList.toggle('hidden');
-  btn.setAttribute('aria-expanded', String(!isHidden));
-  btn.textContent = isHidden ? '⚙ Configure Email Service ▾' : '⚙ Configure Email Service ▴';
-}
-
-function saveEmailLocal() {
-  const email = document.getElementById('notifyEmail').value.trim();
-  const frequency = document.getElementById('notifyFrequency').value;
-  const saved = JSON.parse(localStorage.getItem('emailConfig') || '{}');
-  localStorage.setItem('emailConfig', JSON.stringify({ ...saved, email, frequency }));
-}
-
-function saveEmailConfig() {
-  const serviceId = document.getElementById('ejsServiceId').value.trim();
-  const templateId = document.getElementById('ejsTemplateId').value.trim();
-  const publicKey  = document.getElementById('ejsPublicKey').value.trim();
-  const email      = document.getElementById('notifyEmail').value.trim();
-  const frequency  = document.getElementById('notifyFrequency').value;
-
-  localStorage.setItem('emailConfig', JSON.stringify({ email, frequency, serviceId, templateId, publicKey }));
-
-  const statusEl = document.getElementById('emailStatus');
-  if (serviceId && templateId && publicKey) {
-    emailjs.init({ publicKey });
-    emailjsConfigured = true;
-    statusEl.textContent = '✅ Email service configured';
-    statusEl.className = 'email-status configured';
-    showNotification('✅ Email configuration saved!');
-  } else {
-    emailjsConfigured = false;
-    statusEl.textContent = 'Incomplete — fill in all three fields to enable sending';
-    statusEl.className = 'email-status';
-    showNotification('Config saved (fill all fields to enable email sending).');
+function showCompletionModal() {
+  if (isPlaying) {
+    isPlaying = false;
+    clearInterval(playInterval);
+    document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
   }
-}
 
-function loadEmailConfig() {
-  const saved = JSON.parse(localStorage.getItem('emailConfig') || '{}');
-  if (saved.email)      document.getElementById('notifyEmail').value      = saved.email;
-  if (saved.frequency)  document.getElementById('notifyFrequency').value  = saved.frequency;
-  if (saved.serviceId)  document.getElementById('ejsServiceId').value     = saved.serviceId;
-  if (saved.templateId) document.getElementById('ejsTemplateId').value    = saved.templateId;
-  if (saved.publicKey)  document.getElementById('ejsPublicKey').value     = saved.publicKey;
-
-  const statusEl = document.getElementById('emailStatus');
-  if (saved.serviceId && saved.templateId && saved.publicKey) {
-    emailjs.init({ publicKey: saved.publicKey });
-    emailjsConfigured = true;
-    statusEl.textContent = '✅ Email service configured';
-    statusEl.className = 'email-status configured';
-  }
-}
-
-function buildEmailContent(type) {
   let holdingsVal = 0;
   stocks.forEach(s => {
     if (holdings[s.symbol]) {
       holdingsVal += holdings[s.symbol].shares * s.prices[currentDay];
     }
   });
-  const total = cash + holdingsVal;
-  const pnl = total - startingCapital;
-  const pnlPct = startingCapital !== 0 ? ((pnl / startingCapital) * 100).toFixed(2) : '0.00';
+  const total  = cash + holdingsVal;
+  const pnl    = total - startingCapital;
+  const pnlPct = startingCapital !== 0 ? (pnl / startingCapital) * 100 : 0;
 
-  const marketLines = stocks.map(s => {
-    const p = s.prices[currentDay];
-    const prev = s.prices[Math.max(0, currentDay - 1)];
-    const chg = p - prev;
-    return `  ${s.symbol}: $${p.toFixed(2)} (${chg >= 0 ? '+' : ''}${chg.toFixed(2)})`;
-  }).join('\n');
+  const retEl = document.getElementById('cmReturnValue');
+  retEl.textContent = (pnl >= 0 ? '+' : '-') + '$' + Math.abs(pnl).toFixed(2);
+  retEl.className = 'ret-value ' + (pnl >= 0 ? 'up' : 'down');
+  document.getElementById('cmReturnPct').textContent =
+    (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '% over ' + totalDays + ' days';
 
-  const openPositions = Object.keys(holdings).filter(sym => holdings[sym].shares > 0);
-  const holdingLines = openPositions.length === 0
-    ? '  No open positions'
-    : openPositions.map(sym => {
-        const h = holdings[sym];
-        const stock = stocks.find(s => s.symbol === sym);
-        const val = h.shares * stock.prices[currentDay];
-        const avgCost = (h.totalCost / h.shares).toFixed(2);
-        return `  ${sym}: ${h.shares} shares @ avg $${avgCost} = $${val.toFixed(2)}`;
-      }).join('\n');
+  document.getElementById('cmStartCapital').textContent = '$' + startingCapital.toFixed(2);
+  document.getElementById('cmFinalValue').textContent   = '$' + total.toFixed(2);
+  document.getElementById('cmCash').textContent         = '$' + cash.toFixed(2);
+  document.getElementById('cmTransactions').textContent = String(transactions.length);
 
-  const portfolioBlock =
-    `Portfolio (Day ${currentDay} / ${totalDays}):\n` +
-    `  Cash:            $${cash.toFixed(2)}\n` +
-    `  Holdings Value:  $${holdingsVal.toFixed(2)}\n` +
-    `  Total Value:     $${total.toFixed(2)}\n` +
-    `  P&L:             ${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)} (${pnl >= 0 ? '+' : ''}${pnlPct}%)\n\n` +
-    `Market Prices:\n${marketLines}\n\n` +
-    `Holdings:\n${holdingLines}`;
+  // Stock performance table (sorted best to worst)
+  const stockPerf = stocks.map(s => {
+    const startP  = s.prices[0];
+    const endP    = s.prices[currentDay];
+    const chgPct  = startP !== 0 ? (endP - startP) / startP * 100 : 0;
+    return { symbol: s.symbol, color: s.color, startP, endP, chgPct };
+  }).sort((a, b) => b.chgPct - a.chgPct);
 
-  let subject, message;
-
-  if (type === 'start') {
-    const condition = document.getElementById('marketCondition').value;
-    subject = '📈 Your Stock Market Simulation Has Started';
-    message =
-      `Your simulation has started!\n\n` +
-      `Settings:\n` +
-      `  Starting Capital:  $${startingCapital.toFixed(2)}\n` +
-      `  Duration:          ${totalDays} days\n` +
-      `  Market Condition:  ${condition}\n` +
-      `  Stocks:            ${stocks.map(s => s.symbol).join(', ')}\n\n` +
-      (notifyFrequency > 0
-        ? `You will receive portfolio updates every ${notifyFrequency} simulation days and a final summary when it ends.\n`
-        : `You will receive a final summary when the simulation ends.\n`);
-  } else if (type === 'update') {
-    subject = `📊 Simulation Update – Day ${currentDay} of ${totalDays}`;
-    message = `Here is your simulation update:\n\n${portfolioBlock}`;
-  } else {
-    subject = '🏁 Simulation Complete – Final Results';
-    message = `Your simulation has finished!\n\n${portfolioBlock}\n\nThank you for using the Stock Market Simulator.`;
+  let rowsToShow = stockPerf;
+  if (stockPerf.length > 10) {
+    rowsToShow = [...stockPerf.slice(0, 5), { divider: true }, ...stockPerf.slice(-5)];
   }
 
-  return { subject, message };
-}
-
-function sendSimulationEmail(type) {
-  if (!notifyEmail || !emailjsConfigured) return;
-  const saved = JSON.parse(localStorage.getItem('emailConfig') || '{}');
-  if (!saved.serviceId || !saved.templateId) return;
-
-  const { subject, message } = buildEmailContent(type);
-
-  emailjs.send(saved.serviceId, saved.templateId, {
-    to_email: notifyEmail,
-    subject,
-    message,
-  }).then(() => {
-    showNotification(`📧 Email sent: ${subject}`);
-  }).catch(err => {
-    console.error('EmailJS send error:', err);
-    showNotification('❌ Failed to send email. Please check your EmailJS configuration.');
+  const rowsEl = document.getElementById('cmStockRows');
+  let tableHTML = '<table><thead><tr><th>Symbol</th><th>Start</th><th>End</th><th>Return</th></tr></thead><tbody>';
+  rowsToShow.forEach(r => {
+    if (r.divider) {
+      tableHTML += '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:3px;">&#183;&#183;&#183;</td></tr>';
+    } else {
+      const col = r.chgPct >= 0 ? '#22c55e' : '#ef4444';
+      tableHTML += '<tr>' +
+        '<td style="font-weight:600;color:' + r.color + '">' + r.symbol + '</td>' +
+        '<td>$' + r.startP.toFixed(2) + '</td>' +
+        '<td>$' + r.endP.toFixed(2) + '</td>' +
+        '<td style="color:' + col + '">' + (r.chgPct >= 0 ? '+' : '') + r.chgPct.toFixed(1) + '%</td>' +
+        '</tr>';
+    }
   });
+  tableHTML += '</tbody></table>';
+  rowsEl.innerHTML = tableHTML;
+
+  document.getElementById('completionModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
 }
 
-function checkEmailNotification() {
-  if (!notifyEmail || notifyFrequency <= 0) return;
-  if (currentDay >= totalDays) return; // completion email will be sent separately
-  if (currentDay - lastNotifyDay >= notifyFrequency) {
-    lastNotifyDay = currentDay;
-    sendSimulationEmail('update');
+function closeCompletionModal() {
+  document.getElementById('completionModal').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+// ──────────────────────────────────────────────
+// Bot UI locking
+// ──────────────────────────────────────────────
+
+function lockBotUI() {
+  const textarea = document.getElementById('botScript');
+  const select   = document.getElementById('botStrategySelect');
+  textarea.disabled = true;
+  select.disabled   = true;
+  if (!document.getElementById('botLockedNotice')) {
+    const notice = document.createElement('p');
+    notice.id = 'botLockedNotice';
+    notice.className = 'bot-locked-notice';
+    notice.textContent = '\u{1F512} Bot settings locked while simulation is active. Reset to change strategy.';
+    textarea.parentNode.insertBefore(notice, textarea.nextSibling);
   }
 }
+
+function unlockBotUI() {
+  const textarea = document.getElementById('botScript');
+  const select   = document.getElementById('botStrategySelect');
+  textarea.disabled = false;
+  select.disabled   = false;
+  const notice = document.getElementById('botLockedNotice');
+  if (notice) notice.remove();
+}
+
+// ──────────────────────────────────────────────
+// (Email Notifications removed)
+// ──────────────────────────────────────────────
+
+
+
+
+
+
+
 
 // ──────────────────────────────────────────────
 // Auto-Trading Bot
@@ -2379,8 +2556,6 @@ function appendBotLog(msg) {
 // Initialise the script textarea with the default strategy
 document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
 
-// Load saved email config on page startup
-loadEmailConfig();
 
 // ──────────────────────────────────────────────
 // Theme (light / dark)
@@ -2427,7 +2602,14 @@ document.getElementById('docsModal').addEventListener('click', function (e) {
 });
 
 document.addEventListener('keydown', function (e) {
-  if (e.key === 'Escape' && !document.getElementById('docsModal').classList.contains('hidden')) closeDocs();
+  if (e.key === 'Escape') {
+    if (!document.getElementById('docsModal').classList.contains('hidden')) closeDocs();
+    if (!document.getElementById('completionModal').classList.contains('hidden')) closeCompletionModal();
+  }
+});
+
+document.getElementById('completionModal').addEventListener('click', function(e) {
+  if (e.target === this) closeCompletionModal();
 });
 </script>
 </body>
