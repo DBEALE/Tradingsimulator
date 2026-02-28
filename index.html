@@ -1074,7 +1074,7 @@
         <div class="step-card">
           <div class="step-number">2</div>
           <h3>Start the Simulation</h3>
-          <p>Click <strong>Start Simulation</strong>, then press <strong>▶ Play</strong> to run continuously, <strong>Step →</strong> to advance one day, or <strong>Finish</strong> to end immediately.</p>
+          <p>Click <strong>Start Simulation</strong>, then press <strong>▶ Play</strong> to run continuously, <strong>Step →</strong> to advance one day, or <strong>Finish</strong> to jump straight to completion.</p>
         </div>
         <div class="step-card">
           <div class="step-number">3</div>
@@ -1373,6 +1373,7 @@ let holdings = {};   // { symbol: { shares: number, totalCost: number } }
 let transactions = [];
 let playInterval = null;
 let isPlaying = false;
+let isFinishing = false;
 let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
@@ -1381,6 +1382,7 @@ let visibleBotTradeMarkers = new Set();
 let showBotTradeMarkers = true;
 
 const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
+const FINISH_CHUNK_SIZE = 50;
 
 const STOCK_TEMPLATES = [
   { name: 'AlphaTech',   symbol: 'ATEC', basePrice: 150, volatility: 0.018, drift: 0.0003 },
@@ -1561,6 +1563,7 @@ function startSimulation() {
   transactions = [];
   currentDay = 0;
   isPlaying = false;
+  isFinishing = false;
   botComparisonData = [];
   visibleBotTradeMarkers = new Set();
   showBotTradeMarkers = true;
@@ -1573,8 +1576,6 @@ function startSimulation() {
   buildStockTabs();
   setActiveStock(stocks[0].symbol);
   attachChartHover();
-  updatePortfolioUI();
-  updateTxLog();
   updateMarketTable();
   refreshBotComparisonData();
   updateBotTradeMarkerToggles();
@@ -1597,6 +1598,7 @@ function startSimulation() {
 function resetSimulation() {
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
   isPlaying = false;
+  isFinishing = false;
   document.getElementById('simArea').classList.add('hidden');
   document.getElementById('setupPanel').classList.add('hidden');
   document.getElementById('landingPage').classList.remove('hidden');
@@ -2228,78 +2230,6 @@ function updateMarketTable() {
 }
 
 // ──────────────────────────────────────────────
-// Portfolio UI
-// ──────────────────────────────────────────────
-
-function updatePortfolioUI() {
-  const cashEl = document.getElementById('cashValue');
-  const holdingsEl = document.getElementById('holdingsValue');
-  const totalEl = document.getElementById('totalValue');
-  const pnlEl = document.getElementById('pnlValue');
-  const tbody = document.getElementById('holdingsBody');
-  if (!cashEl || !holdingsEl || !totalEl || !pnlEl || !tbody) return;
-
-  let holdingsVal = 0;
-  stocks.forEach(s => {
-    if (holdings[s.symbol]) {
-      holdingsVal += holdings[s.symbol].shares * s.prices[currentDay];
-    }
-  });
-  const total = cash + holdingsVal;
-  const pnl = total - startingCapital;
-
-  cashEl.textContent = `$${cash.toFixed(2)}`;
-  holdingsEl.textContent = `$${holdingsVal.toFixed(2)}`;
-  totalEl.textContent = `$${total.toFixed(2)}`;
-  pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}`;
-  pnlEl.className = 'value ' + (pnl >= 0 ? 'up' : 'down');
-
-  // Holdings table
-  const symbols = Object.keys(holdings).filter(sym => holdings[sym].shares > 0);
-  if (symbols.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim); text-align:center; padding:12px;">No positions yet</td></tr>';
-    return;
-  }
-  tbody.innerHTML = '';
-  symbols.forEach(sym => {
-    const h = holdings[sym];
-    const stock = stocks.find(s => s.symbol === sym);
-    const currentPrice = stock.prices[currentDay];
-    const value = h.shares * currentPrice;
-    const avgCost = h.totalCost / h.shares;
-    const pnlColor = currentPrice >= avgCost ? '#22c55e' : '#ef4444';
-    tbody.innerHTML += `
-      <tr>
-        <td style="font-weight:600; color:${stock.color}">${sym}</td>
-        <td>${h.shares}</td>
-        <td>$${avgCost.toFixed(2)}</td>
-        <td style="color:${pnlColor}">$${value.toFixed(2)}</td>
-      </tr>
-    `;
-  });
-}
-
-// ──────────────────────────────────────────────
-// Transaction log
-// ──────────────────────────────────────────────
-
-function updateTxLog() {
-  const log = document.getElementById('txLog');
-  if (!log) return;
-  if (transactions.length === 0) {
-    log.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding:20px;">No transactions yet</div>';
-    return;
-  }
-  log.innerHTML = transactions.map(tx => `
-    <div class="tx-item">
-      <span class="tx-badge ${tx.type}">${tx.type.toUpperCase()}</span>
-      <span class="tx-detail">${tx.shares}× ${tx.symbol} · Day ${tx.day}</span>
-      <span class="tx-value">$${tx.total.toFixed(2)}</span>
-    </div>
-  `).join('');
-}
-
-// ──────────────────────────────────────────────
 // Playback
 // ──────────────────────────────────────────────
 
@@ -2344,6 +2274,7 @@ function stepForward() {
 }
 
 function finishSimulation() {
+  if (isFinishing) return;
   if (isPlaying) {
     isPlaying = false;
     clearInterval(playInterval);
@@ -2353,13 +2284,23 @@ function finishSimulation() {
     showCompletionModal();
     return;
   }
+  isFinishing = true;
   lockBotUI();
-  while (currentDay < totalDays) {
-    currentDay++;
-    if (botEnabled) runTradingScript();
-  }
-  updateDay();
-  showCompletionModal();
+  const runChunk = () => {
+    const targetDay = Math.min(currentDay + FINISH_CHUNK_SIZE, totalDays);
+    while (currentDay < targetDay) {
+      currentDay++;
+      if (botEnabled) runTradingScript();
+    }
+    if (currentDay < totalDays) {
+      requestAnimationFrame(runChunk);
+      return;
+    }
+    updateDay();
+    isFinishing = false;
+    showCompletionModal();
+  };
+  runChunk();
 }
 
 function updateDay() {
@@ -2368,7 +2309,6 @@ function updateDay() {
   renderChart();
   renderBotPnlChart();
   updatePriceHeader();
-  updatePortfolioUI();
   updateMarketTable();
 }
 
@@ -2925,8 +2865,6 @@ function runTradingScript() {
     holdings[symbol].totalCost += cost;
     transactions.unshift({ type: 'buy', symbol, shares, price, total: cost, day: currentDay });
     appendBotLog(`🤖 BUY  ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
-    updatePortfolioUI();
-    updateTxLog();
   };
 
   // sell(symbol, shares) — execute a market sell at today's price
@@ -2948,8 +2886,6 @@ function runTradingScript() {
     if (holdings[symbol].shares === 0) delete holdings[symbol];
     transactions.unshift({ type: 'sell', symbol, shares, price, total: proceeds, day: currentDay });
     appendBotLog(`🤖 SELL ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
-    updatePortfolioUI();
-    updateTxLog();
   };
 
   try {
