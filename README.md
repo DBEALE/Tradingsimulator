@@ -46,7 +46,7 @@ Or simply double-click `index.html` in your file manager.
 1. **Configure** – Set your starting capital, number of stocks, simulation period, trading cost, and market condition in the settings panel.
 2. **Start** – Click **▶ Play** to run the simulation continuously, or **Step →** to advance one day at a time.
 3. **Trade** – Use the trade form to buy or sell shares manually at any time.
-4. **Automate** – Enable the Auto-Trading Bot, select one or more preset strategies (multi-select) or write your own JavaScript, and let it trade for you.
+4. **Automate** – In the **Simulation Setup** screen, enable the Auto-Trading Bot, select one or more preset strategies (multi-select) or write your own JavaScript, and let it trade for you.
 5. **Monitor** – Watch the portfolio dashboard and chart update as each day passes.
 
 ### Keyboard Shortcuts
