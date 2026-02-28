@@ -1176,8 +1176,8 @@
             <em>Note: <code>cash</code> is a snapshot at the start of each day's execution; <code>buy()</code> and <code>sell()</code> validate against the live balance.</em>
           </p>
           <div class="field" style="margin-bottom:8px;">
-            <label>Predefined Strategy</label>
-            <select id="botStrategySelect" onchange="loadBotStrategy(this.value)">
+            <label>Predefined Strategy (multi-select for comparison)</label>
+            <select id="botStrategySelect" multiple size="6" onchange="loadBotStrategyFromSelection()">
               <option value="sma" selected>Simple Moving Average (SMA)</option>
               <option value="rsi">RSI (Relative Strength Index)</option>
               <option value="momentum">Momentum</option>
@@ -1352,6 +1352,7 @@
         </div>
       </div>
       <div class="completion-stock-rows" id="cmStockRows"></div>
+      <div class="completion-stock-rows" id="cmBotRows"></div>
     </div>
     <div class="completion-footer">
       <button class="btn btn-primary" onclick="closeCompletionModal(); resetSimulation();">&#8635; Reset &amp; Try Again</button>
@@ -1585,8 +1586,7 @@ function startSimulation() {
   botCheckbox.checked = true;
   botEnabled = true;
 
-  // Lock bot controls once simulation has started
-  lockBotUI();
+  // Keep bot controls editable on day 0; lock once simulation advances.
 }
 
 function resetSimulation() {
@@ -2129,6 +2129,7 @@ function tick() {
     return;
   }
   currentDay++;
+  lockBotUI();
   updateDay();
   if (botEnabled) runTradingScript();
 }
@@ -2139,6 +2140,7 @@ function stepForward() {
     return;
   }
   currentDay++;
+  lockBotUI();
   updateDay();
   if (botEnabled) runTradingScript();
   if (currentDay >= totalDays) showCompletionModal();
@@ -2236,6 +2238,7 @@ function showCompletionModal() {
   });
   tableHTML += '</tbody></table>';
   rowsEl.innerHTML = tableHTML;
+  renderBotComparison();
 
   document.getElementById('completionModal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -2450,6 +2453,121 @@ function loadBotStrategy(key) {
   }
 }
 
+function getSelectedBotStrategyKeys() {
+  const select = document.getElementById('botStrategySelect');
+  return Array.from(select.selectedOptions).map(opt => opt.value).filter(key => BOT_SCRIPTS[key]);
+}
+
+function loadBotStrategyFromSelection() {
+  const selected = getSelectedBotStrategyKeys();
+  if (selected.length > 0) loadBotStrategy(selected[0]);
+}
+
+function simulateBotStrategy(script) {
+  const simHoldings = {};
+  let simCash = startingCapital;
+
+  for (let day = 1; day <= currentDay; day++) {
+    const pricesMap = {};
+    stocks.forEach(s => { pricesMap[s.symbol] = s.prices[day]; });
+
+    const holdingsSnap = {};
+    Object.keys(simHoldings).forEach(sym => {
+      if (simHoldings[sym].shares > 0) {
+        holdingsSnap[sym] = {
+          shares: simHoldings[sym].shares,
+          avgCost: simHoldings[sym].totalCost / simHoldings[sym].shares
+        };
+      }
+    });
+
+    const priceHistoryFn = (symbol, n) => {
+      const stock = stocks.find(s => s.symbol === symbol);
+      if (!stock) return [];
+      const start = Math.max(0, day - n + 1);
+      return stock.prices.slice(start, day + 1);
+    };
+
+    const buyFn = (symbol, shares) => {
+      const stock = stocks.find(s => s.symbol === symbol);
+      if (!stock) return;
+      shares = Math.floor(shares);
+      if (!shares || shares <= 0) return;
+      const price = stock.prices[day];
+      const cost = shares * price + tradingCost;
+      if (cost > simCash) return;
+      simCash -= cost;
+      if (!simHoldings[symbol]) simHoldings[symbol] = { shares: 0, totalCost: 0 };
+      simHoldings[symbol].shares += shares;
+      simHoldings[symbol].totalCost += cost;
+    };
+
+    const sellFn = (symbol, shares) => {
+      const stock = stocks.find(s => s.symbol === symbol);
+      if (!stock) return;
+      shares = Math.floor(shares);
+      if (!shares || shares <= 0) return;
+      if (!simHoldings[symbol] || simHoldings[symbol].shares < shares) return;
+      const price = stock.prices[day];
+      const proceeds = shares * price - tradingCost;
+      simCash += proceeds;
+      simHoldings[symbol].shares -= shares;
+      const ratio = shares / (simHoldings[symbol].shares + shares);
+      simHoldings[symbol].totalCost *= (1 - ratio);
+      if (simHoldings[symbol].shares === 0) delete simHoldings[symbol];
+    };
+
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function(
+        'prices', 'holdings', 'cash', 'day', 'totalDays', 'buy', 'sell', 'priceHistory',
+        script
+      );
+      fn(pricesMap, holdingsSnap, simCash, day, totalDays, buyFn, sellFn, priceHistoryFn);
+    } catch (_err) {}
+  }
+
+  let holdingsVal = 0;
+  stocks.forEach(s => {
+    if (simHoldings[s.symbol]) holdingsVal += simHoldings[s.symbol].shares * s.prices[currentDay];
+  });
+
+  const total = simCash + holdingsVal;
+  return { total, pnl: total - startingCapital };
+}
+
+function renderBotComparison() {
+  const rowsEl = document.getElementById('cmBotRows');
+  const select = document.getElementById('botStrategySelect');
+  const selected = getSelectedBotStrategyKeys();
+  if (selected.length === 0) {
+    rowsEl.innerHTML = '';
+    return;
+  }
+
+  const perf = selected.map(key => {
+    const result = simulateBotStrategy(BOT_SCRIPTS[key]);
+    const option = select.querySelector(`option[value="${key}"]`);
+    return {
+      name: option ? option.textContent : key,
+      total: result.total,
+      pnl: result.pnl
+    };
+  }).sort((a, b) => b.pnl - a.pnl);
+
+  let tableHTML = '<table><thead><tr><th>Bot</th><th>Final Value</th><th>P&amp;L</th></tr></thead><tbody>';
+  perf.forEach(p => {
+    const col = p.pnl >= 0 ? '#22c55e' : '#ef4444';
+    tableHTML += '<tr>' +
+      '<td style="font-weight:600">' + p.name + '</td>' +
+      '<td>$' + p.total.toFixed(2) + '</td>' +
+      '<td style="color:' + col + '">' + (p.pnl >= 0 ? '+' : '-') + '$' + Math.abs(p.pnl).toFixed(2) + '</td>' +
+      '</tr>';
+  });
+  tableHTML += '</tbody></table>';
+  rowsEl.innerHTML = tableHTML;
+}
+
 function toggleBot(enabled) {
   botEnabled = enabled;
 }
@@ -2555,6 +2673,7 @@ function appendBotLog(msg) {
 
 // Initialise the script textarea with the default strategy
 document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
+loadBotStrategyFromSelection();
 
 
 // ──────────────────────────────────────────────

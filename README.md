@@ -18,6 +18,7 @@ A browser-based stock market simulator that lets you practise trading strategies
   - **Momentum** – Buys top-performing stocks over 20 days; sells the worst performers.
   - **Buy & Hold** – Invests equally across all stocks on day 1 and never sells.
   - **Mean Reversion** – Buys when a stock falls 5%+ below its 30-day average; sells on an 8%+ recovery.
+  - Select multiple presets to compare each bot's final P&L in the completion summary.
 - **Bot API** – Bot scripts have access to `prices`, `holdings`, `cash`, `day`, `totalDays`, `buy(symbol, shares)`, `sell(symbol, shares)`, and `priceHistory(symbol, n)`.
 - **Email notifications** – Optional portfolio updates delivered via [EmailJS](https://www.emailjs.com) (no backend required). Configure notification frequency (every 30, 60, or 90 simulation days) or receive only a final summary.
 - **Dark / Light theme** – Toggle between dark and light themes; preference is saved in `localStorage`.
