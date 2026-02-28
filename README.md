@@ -8,6 +8,8 @@ A browser-based stock market simulator that lets you practise trading strategies
 - **Multiple market conditions** – Choose between a normal market, a bull market (upward drift), a bear market (downward drift), or a high-volatility market.
 - **Configurable simulation** – Set the number of stocks (3, 5, or 8), starting capital, trading cost (flat fee per order), and simulation period (30 days to 5 years).
 - **Interactive chart** – Canvas-based price chart with per-stock colour-coding, hover tooltips showing exact prices, and buy/sell trade markers (▲/▼).
+- **Bot trade overlays** – Toggle buy/sell markers for each selected comparison bot directly on the main price chart.
+- **Bot P&L chart** – Dedicated chart showing daily P&L lines for each selected bot.
 - **Multi-stock chart overlay** – Toggle individual stock tabs to show or hide their price lines on the same chart.
 - **Manual trading** – Buy and sell shares using the trade form at any point during the simulation.
 - **Play / Pause / Step** – Run the simulation continuously at an adjustable speed (1× – 10×) or step through one day at a time.
@@ -18,6 +20,7 @@ A browser-based stock market simulator that lets you practise trading strategies
   - **Momentum** – Buys top-performing stocks over 20 days; sells the worst performers.
   - **Buy & Hold** – Invests equally across all stocks on day 1 and never sells.
   - **Mean Reversion** – Buys when a stock falls 5%+ below its 30-day average; sells on an 8%+ recovery.
+  - Select multiple presets to compare each bot's final P&L, portfolio summary, and transaction history in the completion summary.
 - **Bot API** – Bot scripts have access to `prices`, `holdings`, `cash`, `day`, `totalDays`, `buy(symbol, shares)`, `sell(symbol, shares)`, and `priceHistory(symbol, n)`.
 - **Email notifications** – Optional portfolio updates delivered via [EmailJS](https://www.emailjs.com) (no backend required). Configure notification frequency (every 30, 60, or 90 simulation days) or receive only a final summary.
 - **Dark / Light theme** – Toggle between dark and light themes; preference is saved in `localStorage`.
@@ -42,7 +45,7 @@ Or simply double-click `index.html` in your file manager.
 1. **Configure** – Set your starting capital, number of stocks, simulation period, trading cost, and market condition in the settings panel.
 2. **Start** – Click **▶ Play** to run the simulation continuously, or **Step →** to advance one day at a time.
 3. **Trade** – Use the trade form to buy or sell shares manually at any time.
-4. **Automate** – Enable the Auto-Trading Bot, select a preset strategy or write your own JavaScript, and let it trade for you.
+4. **Automate** – Enable the Auto-Trading Bot, select one or more preset strategies (multi-select) or write your own JavaScript, and let it trade for you.
 5. **Monitor** – Watch the portfolio dashboard and chart update as each day passes.
 
 ### Keyboard Shortcuts

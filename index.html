@@ -318,6 +318,24 @@
       height: 100% !important;
     }
 
+    .pnl-chart-wrapper {
+      height: 170px;
+      margin-top: 10px;
+    }
+
+    .bot-trade-toggle-wrap {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .bot-trade-toggle-list {
+      margin-top: 6px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+    }
+    .bot-trade-toggle-list label { cursor: pointer; }
+
     /* ── Simulation controls ── */
     .sim-controls {
       display: flex;
@@ -979,6 +997,34 @@
       border-bottom: 1px solid var(--border-inner);
       color: var(--text);
     }
+    .bot-detail-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 10px;
+      background: var(--bg-input);
+    }
+    .bot-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      font-size: 0.75rem;
+      margin-bottom: 8px;
+    }
+    .bot-detail-grid strong { display: block; color: var(--text-heading); }
+    .bot-tx-list {
+      max-height: 110px;
+      overflow: auto;
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border-inner);
+      padding-top: 6px;
+    }
+    .bot-tx-item {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
 
     .completion-footer {
       display: flex;
@@ -992,6 +1038,7 @@
       .completion-stat-grid { grid-template-columns: 1fr; }
       .completion-footer { padding: 0 16px 16px; }
       .completion-modal-body { padding: 16px; }
+      .bot-detail-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -1125,6 +1172,13 @@
           <div class="chart-wrapper">
             <canvas id="priceChart"></canvas>
           </div>
+          <div id="botTradeToggleWrap" class="bot-trade-toggle-wrap hidden">
+            <label><input type="checkbox" id="showBotTrades" checked onchange="toggleAllBotTradeMarkers(this.checked)"> Show comparison bot trades</label>
+            <div id="botTradeToggleList" class="bot-trade-toggle-list"></div>
+          </div>
+          <div class="chart-wrapper pnl-chart-wrapper">
+            <canvas id="botPnlChart"></canvas>
+          </div>
 
           <div class="sim-controls">
             <button class="btn btn-primary" id="playPauseBtn" onclick="togglePlayPause()">▶ Play</button>
@@ -1176,8 +1230,8 @@
             <em>Note: <code>cash</code> is a snapshot at the start of each day's execution; <code>buy()</code> and <code>sell()</code> validate against the live balance.</em>
           </p>
           <div class="field" style="margin-bottom:8px;">
-            <label>Predefined Strategy</label>
-            <select id="botStrategySelect" onchange="loadBotStrategy(this.value)">
+            <label>Predefined Strategy (multi-select for comparison)</label>
+            <select id="botStrategySelect" multiple size="6" onchange="loadBotStrategyFromSelection()">
               <option value="sma" selected>Simple Moving Average (SMA)</option>
               <option value="rsi">RSI (Relative Strength Index)</option>
               <option value="momentum">Momentum</option>
@@ -1277,7 +1331,9 @@
       <ul>
         <li>Use the <strong>All</strong> and <strong>None</strong> buttons to select or deselect all stocks at once, or click individual stock tabs to toggle.</li>
         <li><strong>Hover</strong> over the chart to see the exact price and any trades on that day.</li>
-        <li>Green triangles (▲) mark <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
+        <li>Green triangles (▲) mark the active bot's <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
+        <li>Use <strong>Show comparison bot trades</strong> and the bot checkboxes to toggle additional bot markers on the chart.</li>
+        <li>The second chart shows <strong>daily P&amp;L per selected bot</strong>.</li>
         <li>Use the <strong>Speed</strong> slider to control simulation pace (1× – 10×).</li>
       </ul>
 
@@ -1290,7 +1346,7 @@
       </ul>
 
       <h3>Auto-Trading Bot</h3>
-      <p>Write a JavaScript snippet that runs automatically each simulation day. Enable or disable the bot with the <strong>Enable</strong> checkbox. Select a predefined strategy from the dropdown, or write your own.</p>
+      <p>Write a JavaScript snippet that runs automatically each simulation day. Enable or disable the bot with the <strong>Enable</strong> checkbox. Select one or more predefined strategies for comparison, or write your own active script.</p>
 
       <h3>Bot API Reference</h3>
       <table>
@@ -1352,6 +1408,8 @@
         </div>
       </div>
       <div class="completion-stock-rows" id="cmStockRows"></div>
+      <div class="completion-stock-rows" id="cmBotRows"></div>
+      <div class="completion-stock-rows" id="cmBotDetailRows"></div>
     </div>
     <div class="completion-footer">
       <button class="btn btn-primary" onclick="closeCompletionModal(); resetSimulation();">&#8635; Reset &amp; Try Again</button>
@@ -1380,6 +1438,9 @@ let isPlaying = false;
 let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
+let botComparisonData = [];
+let visibleBotTradeMarkers = new Set();
+let showBotTradeMarkers = true;
 
 const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
 
@@ -1458,6 +1519,7 @@ const CHART_COLORS = [
   '#fdba74', '#2dd4bf', '#e879f9', '#d9f99d',
   '#93c5fd', '#6ee7b7', '#fde68a', '#fca5a5',
 ];
+const BOT_COMPARISON_COLORS = ['#22c55e', '#f59e0b', '#38bdf8', '#ef4444', '#a855f7', '#14b8a6'];
 
 // ──────────────────────────────────────────────
 // Simulation helpers
@@ -1561,6 +1623,9 @@ function startSimulation() {
   transactions = [];
   currentDay = 0;
   isPlaying = false;
+  botComparisonData = [];
+  visibleBotTradeMarkers = new Set();
+  showBotTradeMarkers = true;
 
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
 
@@ -1573,6 +1638,9 @@ function startSimulation() {
   updatePortfolioUI();
   updateTxLog();
   updateMarketTable();
+  refreshBotComparisonData();
+  updateBotTradeMarkerToggles();
+  renderBotPnlChart();
 
   document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
   document.getElementById('dayDisplay').textContent = 'Day 0 / ' + totalDays;
@@ -1585,8 +1653,7 @@ function startSimulation() {
   botCheckbox.checked = true;
   botEnabled = true;
 
-  // Lock bot controls once simulation has started
-  lockBotUI();
+  // Keep bot controls editable on day 0; lock once simulation advances.
 }
 
 function resetSimulation() {
@@ -1598,6 +1665,9 @@ function resetSimulation() {
   const canvas = document.getElementById('priceChart');
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const pnlCanvas = document.getElementById('botPnlChart');
+  const pnlCtx = pnlCanvas.getContext('2d');
+  pnlCtx.clearRect(0, 0, pnlCanvas.width, pnlCanvas.height);
   closeCompletionModal();
   unlockBotUI();
 }
@@ -1707,6 +1777,36 @@ function getThemeColors() {
     tooltipText:   isLight ? '#1f2937' : '#e0e0e0',
     emptyText:     isLight ? '#9ca3af' : '#6b7280',
   };
+}
+
+function getBotColor(botKey) {
+  const idx = botComparisonData.findIndex(b => b.key === botKey);
+  return BOT_COMPARISON_COLORS[(idx >= 0 ? idx : 0) % BOT_COMPARISON_COLORS.length];
+}
+
+function getVisibleComparisonTrades(symbol, seriesLen) {
+  if (!showBotTradeMarkers) return [];
+  const selected = getSelectedBotStrategyKeys();
+  const activeKey = selected.length > 0 ? selected[0] : null;
+  const trades = [];
+  botComparisonData.forEach(bot => {
+    if (bot.key === activeKey || !visibleBotTradeMarkers.has(bot.key)) return;
+    bot.transactions.forEach(tx => {
+      if (tx.symbol === symbol && tx.day < seriesLen) {
+        trades.push({ ...tx, color: getBotColor(bot.key), botName: bot.name });
+      }
+    });
+  });
+  return trades;
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function renderChart() {
@@ -1839,6 +1939,32 @@ function renderChart() {
       ctx.fillStyle = isBuy ? '#22c55e' : '#ef4444';
       ctx.fill();
     });
+
+    const compareTrades = getVisibleComparisonTrades(stock.symbol, prices.length);
+    const MARKER_OFFSET_SLOTS = 3;
+    const MARKER_OFFSET_CENTER = 1;
+    const MARKER_OFFSET_PX = 4;
+    compareTrades.forEach((trade, idx) => {
+      const mx = xOf(trade.day) + ((idx % MARKER_OFFSET_SLOTS) - MARKER_OFFSET_CENTER) * MARKER_OFFSET_PX;
+      const my = yOf(prices[trade.day]);
+      const isBuy = trade.type === 'buy';
+      const markerHalf = 4;
+      ctx.beginPath();
+      if (isBuy) {
+        ctx.moveTo(mx, my + 4);
+        ctx.lineTo(mx - markerHalf, my + 10);
+        ctx.lineTo(mx + markerHalf, my + 10);
+      } else {
+        ctx.moveTo(mx, my - 4);
+        ctx.lineTo(mx - markerHalf, my - 10);
+        ctx.lineTo(mx + markerHalf, my - 10);
+      }
+      ctx.closePath();
+      ctx.fillStyle = trade.color;
+      ctx.globalAlpha = 0.8;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    });
   });
 
   // ── Legend ──
@@ -1903,10 +2029,13 @@ function renderChart() {
     const tooltipLines = visible.map((stock, si) => {
       const prices = allPriceSeries[si];
       const stockTrades = transactions.filter(tx => tx.symbol === stock.symbol && tx.day < prices.length);
-      const dayTrades = stockTrades.filter(t => t.day === ti);
+      const compareTrades = getVisibleComparisonTrades(stock.symbol, prices.length);
+      const dayTrades = stockTrades.filter(t => t.day === ti)
+        .map(t => ({ ...t, marker: t.type === 'buy' ? '▲' : '▼', suffix: '' }))
+        .concat(compareTrades.filter(t => t.day === ti).map(t => ({ ...t, marker: t.type === 'buy' ? '▲' : '▼', suffix: ` [${t.botName}]` })));
       let text = `${stock.symbol}: $${prices[ti].toFixed(2)}`;
       if (dayTrades.length > 0) {
-        text += '  ' + dayTrades.map(t => `${t.type === 'buy' ? '▲' : '▼'} ${t.shares}×`).join(', ');
+        text += '  ' + dayTrades.map(t => `${t.marker} ${t.shares}×${t.suffix}`).join(', ');
       }
       return { text, color: stock.color };
     });
@@ -1941,6 +2070,68 @@ function renderChart() {
       ctx.fillText(line.text, bx + tipPad, by + (i + 2) * lineH);
     });
   }
+}
+
+function renderBotPnlChart() {
+  const canvas = document.getElementById('botPnlChart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width;
+  const H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const tc = getThemeColors();
+  const PAD = { top: 14, right: 18, bottom: 24, left: 60 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  if (botComparisonData.length === 0 || currentDay < 1) {
+    ctx.fillStyle = tc.emptyText;
+    ctx.textAlign = 'center';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('Advance simulation to view bot P&L chart', W / 2, H / 2);
+    return;
+  }
+
+  const allVals = botComparisonData.flatMap(b => b.pnlSeries.slice(0, currentDay + 1));
+  const minV = Math.min(...allVals, 0);
+  const maxV = Math.max(...allVals, 0);
+  const padV = (maxV - minV) * 0.1 || 1;
+  const lo = minV - padV;
+  const hi = maxV + padV;
+  const xOf = i => PAD.left + (i / currentDay) * plotW;
+  const yOf = v => PAD.top + (1 - (v - lo) / (hi - lo)) * plotH;
+
+  ctx.strokeStyle = tc.grid;
+  ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(p => {
+    const y = PAD.top + p * plotH;
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, y);
+    ctx.lineTo(PAD.left + plotW, y);
+    ctx.stroke();
+  });
+  ctx.fillStyle = tc.axisText;
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(`$${hi.toFixed(0)}`, PAD.left - 6, PAD.top + 3);
+  ctx.fillText('$0', PAD.left - 6, yOf(0) + 3);
+  ctx.fillText(`$${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
+
+  botComparisonData.forEach(bot => {
+    const color = getBotColor(bot.key);
+    ctx.beginPath();
+    bot.pnlSeries.slice(0, currentDay + 1).forEach((v, i) => {
+      i === 0 ? ctx.moveTo(xOf(i), yOf(v)) : ctx.lineTo(xOf(i), yOf(v));
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -2129,6 +2320,7 @@ function tick() {
     return;
   }
   currentDay++;
+  lockBotUI();
   updateDay();
   if (botEnabled) runTradingScript();
 }
@@ -2139,6 +2331,7 @@ function stepForward() {
     return;
   }
   currentDay++;
+  lockBotUI();
   updateDay();
   if (botEnabled) runTradingScript();
   if (currentDay >= totalDays) showCompletionModal();
@@ -2146,7 +2339,9 @@ function stepForward() {
 
 function updateDay() {
   document.getElementById('dayDisplay').textContent = `Day ${currentDay} / ${totalDays}`;
+  refreshBotComparisonData();
   renderChart();
+  renderBotPnlChart();
   updatePriceHeader();
   updatePortfolioUI();
   updateMarketTable();
@@ -2236,6 +2431,8 @@ function showCompletionModal() {
   });
   tableHTML += '</tbody></table>';
   rowsEl.innerHTML = tableHTML;
+  refreshBotComparisonData();
+  renderBotComparison();
 
   document.getElementById('completionModal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -2450,6 +2647,222 @@ function loadBotStrategy(key) {
   }
 }
 
+function getSelectedBotStrategyKeys() {
+  const select = document.getElementById('botStrategySelect');
+  return Array.from(select.selectedOptions).map(opt => opt.value).filter(key => BOT_SCRIPTS[key]);
+}
+
+function getSelectedBotStrategies() {
+  const select = document.getElementById('botStrategySelect');
+  return getSelectedBotStrategyKeys().map(key => {
+    const option = Array.from(select.options).find(opt => opt.value === key);
+    return { key, name: option ? option.textContent : key, script: BOT_SCRIPTS[key] };
+  });
+}
+
+function loadBotStrategyFromSelection() {
+  const selected = getSelectedBotStrategies();
+  if (selected.length > 0) loadBotStrategy(selected[0].key);
+  refreshBotComparisonData();
+  showBotTradeMarkers = true;
+  visibleBotTradeMarkers = new Set(selected.map(s => s.key));
+  updateBotTradeMarkerToggles();
+  if (stocks.length > 0) {
+    renderChart();
+    renderBotPnlChart();
+  }
+}
+
+function calculateHoldingsValue(holdingsMap, day) {
+  let holdingsVal = 0;
+  stocks.forEach(s => {
+    if (holdingsMap[s.symbol]) holdingsVal += holdingsMap[s.symbol].shares * s.prices[day];
+  });
+  return holdingsVal;
+}
+
+function simulateBotStrategy(meta) {
+  const simHoldings = {};
+  const simTransactions = [];
+  let simCash = startingCapital;
+  const pnlSeries = [0];
+
+  for (let day = 1; day <= currentDay; day++) {
+    const pricesMap = {};
+    stocks.forEach(s => { pricesMap[s.symbol] = s.prices[day]; });
+
+    const holdingsSnap = {};
+    Object.keys(simHoldings).forEach(sym => {
+      if (simHoldings[sym].shares > 0) {
+        holdingsSnap[sym] = {
+          shares: simHoldings[sym].shares,
+          avgCost: simHoldings[sym].totalCost / simHoldings[sym].shares
+        };
+      }
+    });
+
+    const priceHistoryFn = (symbol, n) => {
+      const stock = stocks.find(s => s.symbol === symbol);
+      if (!stock) return [];
+      const start = Math.max(0, day - n + 1);
+      return stock.prices.slice(start, day + 1);
+    };
+
+    const buyFn = (symbol, shares) => {
+      const stock = stocks.find(s => s.symbol === symbol);
+      if (!stock) return;
+      shares = Math.floor(shares);
+      if (!shares || shares <= 0) return;
+      const price = stock.prices[day];
+      const cost = shares * price + tradingCost;
+      if (cost > simCash) return;
+      simCash -= cost;
+      if (!simHoldings[symbol]) simHoldings[symbol] = { shares: 0, totalCost: 0 };
+      simHoldings[symbol].shares += shares;
+      simHoldings[symbol].totalCost += cost;
+      simTransactions.push({ type: 'buy', symbol, shares, price, total: cost, day, botKey: meta.key });
+    };
+
+    const sellFn = (symbol, shares) => {
+      const stock = stocks.find(s => s.symbol === symbol);
+      if (!stock) return;
+      shares = Math.floor(shares);
+      if (!shares || shares <= 0) return;
+      if (!simHoldings[symbol] || simHoldings[symbol].shares < shares) return;
+      const price = stock.prices[day];
+      const proceeds = shares * price - tradingCost;
+      const prevShares = simHoldings[symbol].shares;
+      if (prevShares <= 0) return;
+      simCash += proceeds;
+      simHoldings[symbol].shares -= shares;
+      const ratio = shares / prevShares;
+      simHoldings[symbol].totalCost *= (1 - ratio);
+      if (simHoldings[symbol].shares === 0) delete simHoldings[symbol];
+      simTransactions.push({ type: 'sell', symbol, shares, price, total: proceeds, day, botKey: meta.key });
+    };
+
+    try {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function(
+        'prices', 'holdings', 'cash', 'day', 'totalDays', 'buy', 'sell', 'priceHistory',
+        meta.script
+      );
+      fn(pricesMap, holdingsSnap, simCash, day, totalDays, buyFn, sellFn, priceHistoryFn);
+    } catch (_err) {
+      // Ignore strategy errors in comparison mode to keep other selected bots comparable.
+    }
+    const dayTotal = simCash + calculateHoldingsValue(simHoldings, day);
+    pnlSeries.push(dayTotal - startingCapital);
+  }
+
+  const holdingsVal = calculateHoldingsValue(simHoldings, currentDay);
+  const total = simCash + holdingsVal;
+  return {
+    key: meta.key,
+    name: meta.name,
+    cash: simCash,
+    holdings: simHoldings,
+    transactions: simTransactions,
+    pnlSeries,
+    holdingsVal,
+    total,
+    pnl: total - startingCapital
+  };
+}
+
+function refreshBotComparisonData() {
+  const selected = getSelectedBotStrategies();
+  botComparisonData = selected.map(meta => simulateBotStrategy(meta));
+
+  const validKeys = new Set(botComparisonData.map(b => b.key));
+  visibleBotTradeMarkers.forEach(k => { if (!validKeys.has(k)) visibleBotTradeMarkers.delete(k); });
+  if (showBotTradeMarkers && visibleBotTradeMarkers.size === 0) {
+    botComparisonData.forEach(b => visibleBotTradeMarkers.add(b.key));
+  }
+}
+
+function updateBotTradeMarkerToggles() {
+  const wrap = document.getElementById('botTradeToggleWrap');
+  const list = document.getElementById('botTradeToggleList');
+  const master = document.getElementById('showBotTrades');
+
+  if (botComparisonData.length === 0) {
+    wrap.classList.add('hidden');
+    list.innerHTML = '';
+    return;
+  }
+
+  wrap.classList.remove('hidden');
+  master.checked = showBotTradeMarkers;
+  list.innerHTML = '';
+  botComparisonData.forEach(bot => {
+    const lbl = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = visibleBotTradeMarkers.has(bot.key);
+    input.onchange = () => toggleBotTradeMarker(bot.key, input.checked);
+    lbl.appendChild(input);
+    lbl.appendChild(document.createTextNode(' ' + bot.name));
+    list.appendChild(lbl);
+  });
+}
+
+function toggleAllBotTradeMarkers(enabled) {
+  showBotTradeMarkers = enabled;
+  visibleBotTradeMarkers.clear();
+  if (enabled) botComparisonData.forEach(bot => visibleBotTradeMarkers.add(bot.key));
+  updateBotTradeMarkerToggles();
+  renderChart();
+}
+
+function toggleBotTradeMarker(botKey, enabled) {
+  if (enabled) visibleBotTradeMarkers.add(botKey);
+  else visibleBotTradeMarkers.delete(botKey);
+  renderChart();
+}
+
+function renderBotComparison() {
+  const rowsEl = document.getElementById('cmBotRows');
+  const detailEl = document.getElementById('cmBotDetailRows');
+  if (botComparisonData.length === 0) {
+    rowsEl.innerHTML = '';
+    detailEl.innerHTML = '';
+    return;
+  }
+
+  const perf = [...botComparisonData].sort((a, b) => b.pnl - a.pnl);
+
+  let tableHTML = '<table><thead><tr><th>Bot</th><th>Final Value</th><th>P&amp;L</th></tr></thead><tbody>';
+  perf.forEach(p => {
+    const col = p.pnl >= 0 ? '#22c55e' : '#ef4444';
+    tableHTML += '<tr>' +
+      '<td style="font-weight:600">' + escapeHtml(p.name) + '</td>' +
+      '<td>$' + p.total.toFixed(2) + '</td>' +
+      '<td style="color:' + col + '">' + (p.pnl >= 0 ? '+' : '-') + '$' + Math.abs(p.pnl).toFixed(2) + '</td>' +
+      '</tr>';
+  });
+  tableHTML += '</tbody></table>';
+  rowsEl.innerHTML = tableHTML;
+
+  detailEl.innerHTML = perf.map(bot => {
+    const txList = bot.transactions.length === 0
+      ? '<div style="color:var(--text-dim)">No transactions</div>'
+      : bot.transactions.slice(-12).reverse().map(tx =>
+        `<div class="bot-tx-item"><span>${tx.type.toUpperCase()} ${tx.shares}× ${escapeHtml(tx.symbol)} · Day ${tx.day}</span><strong>$${tx.total.toFixed(2)}</strong></div>`
+      ).join('');
+    return `<div class="bot-detail-card">
+      <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(bot.name)}</div>
+      <div class="bot-detail-grid">
+        <div><span>Cash</span><strong>$${bot.cash.toFixed(2)}</strong></div>
+        <div><span>Holdings</span><strong>$${bot.holdingsVal.toFixed(2)}</strong></div>
+        <div><span>Total</span><strong>$${bot.total.toFixed(2)}</strong></div>
+        <div><span>P&amp;L</span><strong style="color:${bot.pnl >= 0 ? '#22c55e' : '#ef4444'}">${bot.pnl >= 0 ? '+' : '-'}$${Math.abs(bot.pnl).toFixed(2)}</strong></div>
+      </div>
+      <div class="bot-tx-list">${txList}</div>
+    </div>`;
+  }).join('');
+}
+
 function toggleBot(enabled) {
   botEnabled = enabled;
 }
@@ -2555,6 +2968,7 @@ function appendBotLog(msg) {
 
 // Initialise the script textarea with the default strategy
 document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
+loadBotStrategyFromSelection();
 
 
 // ──────────────────────────────────────────────
@@ -2567,7 +2981,10 @@ function toggleTheme() {
   html.setAttribute('data-theme', newTheme);
   document.getElementById('themeToggle').textContent = newTheme === 'light' ? '🌙' : '☀️';
   localStorage.setItem('theme', newTheme);
-  if (stocks.length > 0) renderChart();
+  if (stocks.length > 0) {
+    renderChart();
+    renderBotPnlChart();
+  }
 }
 
 // Apply saved or preferred theme on load
