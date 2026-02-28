@@ -906,7 +906,7 @@
       border: 1px solid var(--border);
       border-radius: 16px;
       width: 100%;
-      max-width: 520px;
+      max-width: 820px;
       box-shadow: 0 24px 48px rgba(0,0,0,0.5);
     }
 
@@ -926,6 +926,16 @@
 
     .completion-modal-body {
       padding: 20px 24px;
+    }
+
+    .completion-body-columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .completion-col {
+      min-width: 0;
     }
 
     .completion-stat-grid {
@@ -983,7 +993,7 @@
     .completion-stock-rows {
       font-size: 0.8rem;
       margin-bottom: 16px;
-      max-height: 200px;
+      max-height: 280px;
       overflow-y: auto;
     }
 
@@ -1047,8 +1057,9 @@
 
     .completion-footer .btn { flex: 1; }
 
-    @media (max-width: 500px) {
+    @media (max-width: 600px) {
       .completion-stat-grid { grid-template-columns: 1fr; }
+      .completion-body-columns { grid-template-columns: 1fr; }
       .completion-footer { padding: 0 16px 16px; }
       .completion-modal-body { padding: 16px; }
       .bot-detail-grid { grid-template-columns: 1fr 1fr; }
@@ -1092,7 +1103,7 @@
         <div class="step-card">
           <div class="step-number">3</div>
           <h3>Trade</h3>
-          <p>Use the <strong>All</strong> / <strong>None</strong> buttons to toggle stock visibility. The Auto-Trading Bot executes a strategy automatically &mdash; configure it before starting the simulation.</p>
+          <p>Click individual stock tabs to switch which stock is displayed on the chart. The Auto-Trading Bot executes a strategy automatically &mdash; configure it before starting the simulation.</p>
         </div>
         <div class="step-card">
           <div class="step-number">4</div>
@@ -1199,10 +1210,6 @@
       <!-- Left: Chart -->
       <div>
         <div class="card" style="margin-bottom:20px;">
-          <div class="stock-tabs-controls" id="stockTabsControls" style="display:none;">
-            <button class="btn btn-secondary" onclick="selectAllStocks()">All</button>
-            <button class="btn btn-secondary" onclick="selectNoneStocks()">None</button>
-          </div>
           <div class="stock-tabs" id="stockTabs"></div>
 
           <div class="price-header">
@@ -1215,7 +1222,6 @@
             <canvas id="priceChart"></canvas>
           </div>
           <div id="botTradeToggleWrap" class="bot-trade-toggle-wrap hidden">
-            <label><input type="checkbox" id="showBotTrades" checked onchange="toggleAllBotTradeMarkers(this.checked)"> Show comparison bot trades</label>
             <div id="botTradeToggleList" class="bot-trade-toggle-list"></div>
           </div>
           <div class="chart-wrapper pnl-chart-wrapper">
@@ -1297,10 +1303,10 @@
 
       <h3>Chart &amp; Controls</h3>
       <ul>
-        <li>Use the <strong>All</strong> and <strong>None</strong> buttons to select or deselect all stocks at once, or click individual stock tabs to toggle.</li>
+        <li>Click individual stock tabs to switch which stock is displayed on the chart.</li>
         <li><strong>Hover</strong> over the chart to see the exact price and any trades on that day.</li>
         <li>Green triangles (▲) mark the active bot's <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
-        <li>Use <strong>Show comparison bot trades</strong> and the bot checkboxes to toggle additional bot markers on the chart.</li>
+        <li>Use the bot checkboxes beneath the chart to toggle comparison bot trade markers.</li>
         <li>The second chart shows <strong>daily P&amp;L per selected bot</strong>.</li>
         <li>Use the <strong>Speed</strong> slider to control simulation pace (1× – 10×).</li>
       </ul>
@@ -1344,22 +1350,28 @@
       <button class="modal-close" onclick="closeCompletionModal()" aria-label="Close">&#10005;</button>
     </div>
     <div class="completion-modal-body">
-      <div class="completion-stat-grid">
-        <div class="completion-stat">
-          <div class="c-label">Starting Capital</div>
-          <div class="c-value" id="cmStartCapital">$0.00</div>
+      <div class="completion-body-columns">
+        <div class="completion-col">
+          <div class="completion-stat-grid">
+            <div class="completion-stat">
+              <div class="c-label">Starting Capital</div>
+              <div class="c-value" id="cmStartCapital">$0.00</div>
+            </div>
+            <div class="completion-stat">
+              <div class="c-label">Total Transactions</div>
+              <div class="c-value" id="cmTransactions">0</div>
+            </div>
+          </div>
+          <div class="completion-stock-rows" id="cmStockRows"></div>
         </div>
-        <div class="completion-stat">
-          <div class="c-label">Total Transactions</div>
-          <div class="c-value" id="cmTransactions">0</div>
+        <div class="completion-col">
+          <div class="completion-chart-wrap">
+            <canvas id="cmBotPnlChart"></canvas>
+          </div>
+          <div class="completion-stock-rows" id="cmBotRows"></div>
+          <div class="completion-stock-rows" id="cmBotDetailRows"></div>
         </div>
       </div>
-      <div class="completion-stock-rows" id="cmStockRows"></div>
-      <div class="completion-chart-wrap">
-        <canvas id="cmBotPnlChart"></canvas>
-      </div>
-      <div class="completion-stock-rows" id="cmBotRows"></div>
-      <div class="completion-stock-rows" id="cmBotDetailRows"></div>
     </div>
     <div class="completion-footer">
       <button class="btn btn-primary" onclick="closeCompletionModal(); resetSimulation();">&#8635; Reset &amp; Try Again</button>
@@ -1375,7 +1387,7 @@
 // ──────────────────────────────────────────────
 // State
 // ──────────────────────────────────────────────
-const APP_VERSION = '0.1.2';
+const APP_VERSION = '0.1.3';
 const appVersionEl = document.getElementById('appVersion');
 appVersionEl.textContent = APP_VERSION;
 appVersionEl.parentElement.style.visibility = 'visible';
@@ -1649,24 +1661,11 @@ function buildStockTabs() {
     btn.onclick = () => toggleStockVisibility(s.symbol);
     tabs.appendChild(btn);
   });
-  // Show All/None controls when there are multiple stocks
-  const controls = document.getElementById('stockTabsControls');
-  controls.style.display = stocks.length > 1 ? 'flex' : 'none';
 }
 
 function toggleStockVisibility(symbol) {
-  if (visibleStocks.has(symbol)) {
-    // Prevent hiding the last visible stock
-    if (visibleStocks.size > 1) {
-      visibleStocks.delete(symbol);
-      if (activeStock === symbol) {
-        activeStock = [...visibleStocks][0];
-      }
-    }
-  } else {
-    visibleStocks.add(symbol);
-    activeStock = symbol;
-  }
+  visibleStocks = new Set([symbol]);
+  activeStock = symbol;
   updateTabStyles();
   renderChart();
   updatePriceHeader();
@@ -2749,7 +2748,6 @@ function refreshBotComparisonData() {
 function updateBotTradeMarkerToggles() {
   const wrap = document.getElementById('botTradeToggleWrap');
   const list = document.getElementById('botTradeToggleList');
-  const master = document.getElementById('showBotTrades');
 
   if (botComparisonData.length === 0) {
     wrap.classList.add('hidden');
@@ -2758,7 +2756,6 @@ function updateBotTradeMarkerToggles() {
   }
 
   wrap.classList.remove('hidden');
-  master.checked = showBotTradeMarkers;
   list.innerHTML = '';
   botComparisonData.forEach(bot => {
     const lbl = document.createElement('label');
