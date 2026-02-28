@@ -1,4 +1,4 @@
-# Copilot instructions for Tradingsimulator
+# Copilot instructions for TradingSimulator
 
 - Keep changes minimal and focused on the requested task.
 - This project is intentionally simple: all app code lives in `/index.html` (HTML, CSS, and JavaScript together).
