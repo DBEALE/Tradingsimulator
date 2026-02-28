@@ -2524,7 +2524,9 @@ function simulateBotStrategy(script) {
         script
       );
       fn(pricesMap, holdingsSnap, simCash, day, totalDays, buyFn, sellFn, priceHistoryFn);
-    } catch (_err) {}
+    } catch (_err) {
+      // Ignore strategy errors in comparison mode to keep other selected bots comparable.
+    }
   }
 
   let holdingsVal = 0;
