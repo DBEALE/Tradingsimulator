@@ -98,6 +98,7 @@
       top: 10px;
       right: 12px;
       z-index: 1000;
+      visibility: hidden;
       background: var(--bg-card);
       border: 1px solid var(--border);
       border-radius: 999px;
@@ -1067,7 +1068,7 @@
     <button class="btn-icon" onclick="openDocs()" title="Documentation">📖 Docs</button>
   </div>
 </header>
-<div class="version-tag">v<span id="appVersion">0.1.0</span></div>
+<div class="version-tag">v<span id="appVersion"></span></div>
 
 <div class="container">
 
@@ -1379,7 +1380,9 @@
 // State
 // ──────────────────────────────────────────────
 const APP_VERSION = '0.1.0';
-document.getElementById('appVersion').textContent = APP_VERSION;
+const appVersionEl = document.getElementById('appVersion');
+appVersionEl.textContent = APP_VERSION;
+appVersionEl.parentElement.style.visibility = 'visible';
 
 let stocks = [];
 let currentDay = 0;

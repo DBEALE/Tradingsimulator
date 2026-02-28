@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   bump-version:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,12 +30,6 @@ jobs:
           html = re.sub(
               r"const APP_VERSION = '\d+\.\d+\.\d+';",
               f"const APP_VERSION = '{next_version}';",
-              html,
-              count=1,
-          )
-          html = re.sub(
-              r'<span id="appVersion">\d+\.\d+\.\d+</span>',
-              f'<span id="appVersion">{next_version}</span>',
               html,
               count=1,
           )
