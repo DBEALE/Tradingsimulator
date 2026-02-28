@@ -211,12 +211,8 @@
     /* ── Main layout ── */
     .main-grid {
       display: grid;
-      grid-template-columns: 1fr 340px;
+      grid-template-columns: 1fr;
       gap: 20px;
-    }
-
-    @media (max-width: 900px) {
-      .main-grid { grid-template-columns: 1fr; }
     }
 
     /* ── Card ── */
@@ -979,6 +975,11 @@
       overflow-y: auto;
     }
 
+    .completion-chart-wrap {
+      height: 170px;
+      margin-bottom: 16px;
+    }
+
     .completion-stock-rows table {
       width: 100%;
       border-collapse: collapse;
@@ -1073,7 +1074,7 @@
         <div class="step-card">
           <div class="step-number">2</div>
           <h3>Start the Simulation</h3>
-          <p>Click <strong>Start Simulation</strong>, then press <strong>▶ Play</strong> to run continuously or <strong>Step →</strong> to advance one day at a time.</p>
+          <p>Click <strong>Start Simulation</strong>, then press <strong>▶ Play</strong> to run continuously, <strong>Step →</strong> to advance one day, or <strong>Finish</strong> to jump straight to completion.</p>
         </div>
         <div class="step-card">
           <div class="step-number">3</div>
@@ -1083,12 +1084,12 @@
         <div class="step-card">
           <div class="step-number">4</div>
           <h3>Monitor</h3>
-          <p>Watch the live chart, portfolio dashboard (with prominent P&amp;L display), and transaction log update as each simulated day passes.</p>
+          <p>Watch the live chart, market overview, and bot analytics update as each simulated day passes.</p>
         </div>
         <div class="step-card">
           <div class="step-number">5</div>
           <h3>Review &amp; Reset</h3>
-          <p>When the simulation ends, a <strong>summary popup</strong> shows your total return, final portfolio value, and stock performance. Click <strong>&#8635; Reset</strong> to try a new strategy.</p>
+          <p>When the simulation ends, a <strong>summary popup</strong> shows stock performance plus the bot P&amp;L graph and rankings. Click <strong>&#8635; Reset</strong> to try a new strategy.</p>
         </div>
       </div>
 
@@ -1142,6 +1143,17 @@
         <input type="number" id="tradingCostInput" value="5.00" min="0" step="0.01" />
       </div>
       <div class="field">
+        <label>Bot Strategy (multi-select for comparison)</label>
+        <select id="botStrategySelect" multiple size="6" onchange="loadBotStrategyFromSelection()">
+          <option value="sma" selected>Simple Moving Average (SMA)</option>
+          <option value="rsi">RSI (Relative Strength Index)</option>
+          <option value="momentum">Momentum</option>
+          <option value="buyhold">Buy &amp; Hold</option>
+          <option value="meanreversion">Mean Reversion</option>
+          <option value="graduateddca">Graduated DCA</option>
+        </select>
+      </div>
+      <div class="field">
         <label>&nbsp;</label>
         <button class="btn btn-primary" id="startBtn" onclick="startSimulation()">Start Simulation</button>
       </div>
@@ -1183,6 +1195,7 @@
           <div class="sim-controls">
             <button class="btn btn-primary" id="playPauseBtn" onclick="togglePlayPause()">▶ Play</button>
             <button class="btn btn-secondary" onclick="stepForward()">Step →</button>
+            <button class="btn btn-secondary" onclick="finishSimulation()">Finish</button>
             <button class="btn btn-secondary" onclick="resetSimulation()">↺ Reset</button>
             <span class="day-display" id="dayDisplay">Day 0 / 0</span>
           </div>
@@ -1229,66 +1242,8 @@
             <code>buy(symbol, shares)</code> · <code>sell(symbol, shares)</code> · <code>priceHistory(symbol, n)</code><br>
             <em>Note: <code>cash</code> is a snapshot at the start of each day's execution; <code>buy()</code> and <code>sell()</code> validate against the live balance.</em>
           </p>
-          <div class="field" style="margin-bottom:8px;">
-            <label>Predefined Strategy (multi-select for comparison)</label>
-            <select id="botStrategySelect" multiple size="6" onchange="loadBotStrategyFromSelection()">
-              <option value="sma" selected>Simple Moving Average (SMA)</option>
-              <option value="rsi">RSI (Relative Strength Index)</option>
-              <option value="momentum">Momentum</option>
-              <option value="buyhold">Buy &amp; Hold</option>
-              <option value="meanreversion">Mean Reversion</option>
-              <option value="graduateddca">Graduated DCA</option>
-            </select>
-          </div>
           <textarea class="bot-script" id="botScript" spellcheck="false"></textarea>
           <div class="bot-log hidden" id="botLog"></div>
-        </div>
-      </div>
-
-      <!-- Right: Portfolio -->
-      <div>
-        <div class="card" style="margin-bottom:16px;">
-          <h3>Portfolio</h3>
-          <div class="portfolio-summary">
-            <div class="stat-box">
-              <div class="label">Cash</div>
-              <div class="value" id="cashValue">$0.00</div>
-            </div>
-            <div class="stat-box">
-              <div class="label">Holdings Value</div>
-              <div class="value" id="holdingsValue">$0.00</div>
-            </div>
-            <div class="stat-box">
-              <div class="label">Total Value</div>
-              <div class="value" id="totalValue">$0.00</div>
-            </div>
-            <div class="stat-box pnl-box">
-              <div class="label">P&amp;L (Profit / Loss)</div>
-              <div class="value" id="pnlValue">$0.00</div>
-            </div>
-          </div>
-
-          <h3 style="margin-top:4px;">Holdings</h3>
-          <table class="holdings-table">
-            <thead>
-              <tr>
-                <th>Symbol</th>
-                <th>Shares</th>
-                <th>Avg Cost</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-            <tbody id="holdingsBody">
-              <tr><td colspan="4" style="color:var(--text-dim); text-align:center; padding:12px;">No positions yet</td></tr>
-            </tbody>
-          </table>
-        </div>
-
-        <div class="card">
-          <h3>Transaction History</h3>
-          <div class="tx-log" id="txLog">
-            <div style="color:var(--text-dim); text-align:center; padding:20px;">No transactions yet</div>
-          </div>
         </div>
       </div>
 
@@ -1311,7 +1266,7 @@
       <ol>
         <li>Fill in the <strong>Simulation Setup</strong> fields and click <strong>Start Simulation</strong>.</li>
         <li>Press <strong>▶ Play</strong> to run the simulation, or use <strong>Step →</strong> to advance one day at a time.</li>
-        <li>Watch the chart and portfolio update as each day passes.</li>
+        <li>Watch the chart and bot analytics update as each day passes.</li>
         <li>Click <strong>↺ Reset</strong> at any time to return to the setup screen.</li>
       </ol>
 
@@ -1324,6 +1279,7 @@
           <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), High Volatility, Dot-com Boom &amp; Bust, 2008 Financial Crisis, or COVID Crash &amp; Recovery.</td></tr>
           <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (1, 5, 10, 25, or 100).</td></tr>
           <tr><td><strong>Trading Cost</strong></td><td>Flat fee deducted from each buy or sell order (default $5.00).</td></tr>
+          <tr><td><strong>Bot Strategy</strong></td><td>Select one or more predefined bot strategies before starting the simulation.</td></tr>
         </tbody>
       </table>
 
@@ -1335,14 +1291,6 @@
         <li>Use <strong>Show comparison bot trades</strong> and the bot checkboxes to toggle additional bot markers on the chart.</li>
         <li>The second chart shows <strong>daily P&amp;L per selected bot</strong>.</li>
         <li>Use the <strong>Speed</strong> slider to control simulation pace (1× – 10×).</li>
-      </ul>
-
-      <h3>Portfolio</h3>
-      <ul>
-        <li><strong>Cash</strong> – Your available buying power.</li>
-        <li><strong>Holdings Value</strong> – Current market value of all open positions.</li>
-        <li><strong>Total Value</strong> – Cash + Holdings Value.</li>
-        <li><strong>P&amp;L</strong> – Profit or loss relative to your starting capital.</li>
       </ul>
 
       <h3>Auto-Trading Bot</h3>
@@ -1384,23 +1332,10 @@
       <button class="modal-close" onclick="closeCompletionModal()" aria-label="Close">&#10005;</button>
     </div>
     <div class="completion-modal-body">
-      <div class="completion-return-box">
-        <div class="ret-label">Total Return</div>
-        <div class="ret-value" id="cmReturnValue">+$0.00</div>
-        <div style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;" id="cmReturnPct">+0.00%</div>
-      </div>
       <div class="completion-stat-grid">
         <div class="completion-stat">
           <div class="c-label">Starting Capital</div>
           <div class="c-value" id="cmStartCapital">$0.00</div>
-        </div>
-        <div class="completion-stat">
-          <div class="c-label">Final Value</div>
-          <div class="c-value" id="cmFinalValue">$0.00</div>
-        </div>
-        <div class="completion-stat">
-          <div class="c-label">Cash Remaining</div>
-          <div class="c-value" id="cmCash">$0.00</div>
         </div>
         <div class="completion-stat">
           <div class="c-label">Total Transactions</div>
@@ -1408,6 +1343,9 @@
         </div>
       </div>
       <div class="completion-stock-rows" id="cmStockRows"></div>
+      <div class="completion-chart-wrap">
+        <canvas id="cmBotPnlChart"></canvas>
+      </div>
       <div class="completion-stock-rows" id="cmBotRows"></div>
       <div class="completion-stock-rows" id="cmBotDetailRows"></div>
     </div>
@@ -1435,6 +1373,7 @@ let holdings = {};   // { symbol: { shares: number, totalCost: number } }
 let transactions = [];
 let playInterval = null;
 let isPlaying = false;
+let isFinishing = false;
 let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
@@ -1443,6 +1382,7 @@ let visibleBotTradeMarkers = new Set();
 let showBotTradeMarkers = true;
 
 const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
+const FINISH_CHUNK_SIZE = 50;
 
 const STOCK_TEMPLATES = [
   { name: 'AlphaTech',   symbol: 'ATEC', basePrice: 150, volatility: 0.018, drift: 0.0003 },
@@ -1623,6 +1563,7 @@ function startSimulation() {
   transactions = [];
   currentDay = 0;
   isPlaying = false;
+  isFinishing = false;
   botComparisonData = [];
   visibleBotTradeMarkers = new Set();
   showBotTradeMarkers = true;
@@ -1635,8 +1576,6 @@ function startSimulation() {
   buildStockTabs();
   setActiveStock(stocks[0].symbol);
   attachChartHover();
-  updatePortfolioUI();
-  updateTxLog();
   updateMarketTable();
   refreshBotComparisonData();
   updateBotTradeMarkerToggles();
@@ -1659,6 +1598,7 @@ function startSimulation() {
 function resetSimulation() {
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
   isPlaying = false;
+  isFinishing = false;
   document.getElementById('simArea').classList.add('hidden');
   document.getElementById('setupPanel').classList.add('hidden');
   document.getElementById('landingPage').classList.remove('hidden');
@@ -2134,6 +2074,69 @@ function renderBotPnlChart() {
   });
 }
 
+function renderCompletionBotPnlChart() {
+  const canvas = document.getElementById('cmBotPnlChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width;
+  const H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const tc = getThemeColors();
+  const PAD = { top: 14, right: 18, bottom: 24, left: 60 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  if (botComparisonData.length === 0 || currentDay < 1) {
+    ctx.fillStyle = tc.emptyText;
+    ctx.textAlign = 'center';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('No bot P&L data available', W / 2, H / 2);
+    return;
+  }
+
+  const allVals = botComparisonData.flatMap(b => b.pnlSeries.slice(0, currentDay + 1));
+  const minV = Math.min(...allVals, 0);
+  const maxV = Math.max(...allVals, 0);
+  const padV = (maxV - minV) * 0.1 || 1;
+  const lo = minV - padV;
+  const hi = maxV + padV;
+  const xOf = i => PAD.left + (i / currentDay) * plotW;
+  const yOf = v => PAD.top + (1 - (v - lo) / (hi - lo)) * plotH;
+
+  ctx.strokeStyle = tc.grid;
+  ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(p => {
+    const y = PAD.top + p * plotH;
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, y);
+    ctx.lineTo(PAD.left + plotW, y);
+    ctx.stroke();
+  });
+  ctx.fillStyle = tc.axisText;
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText(`$${hi.toFixed(0)}`, PAD.left - 6, PAD.top + 3);
+  ctx.fillText('$0', PAD.left - 6, yOf(0) + 3);
+  ctx.fillText(`$${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
+
+  botComparisonData.forEach(bot => {
+    const color = getBotColor(bot.key);
+    ctx.beginPath();
+    bot.pnlSeries.slice(0, currentDay + 1).forEach((v, i) => {
+      i === 0 ? ctx.moveTo(xOf(i), yOf(v)) : ctx.lineTo(xOf(i), yOf(v));
+    });
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -2227,73 +2230,6 @@ function updateMarketTable() {
 }
 
 // ──────────────────────────────────────────────
-// Portfolio UI
-// ──────────────────────────────────────────────
-
-function updatePortfolioUI() {
-  let holdingsVal = 0;
-  stocks.forEach(s => {
-    if (holdings[s.symbol]) {
-      holdingsVal += holdings[s.symbol].shares * s.prices[currentDay];
-    }
-  });
-  const total = cash + holdingsVal;
-  const pnl = total - startingCapital;
-
-  document.getElementById('cashValue').textContent = `$${cash.toFixed(2)}`;
-  document.getElementById('holdingsValue').textContent = `$${holdingsVal.toFixed(2)}`;
-  document.getElementById('totalValue').textContent = `$${total.toFixed(2)}`;
-
-  const pnlEl = document.getElementById('pnlValue');
-  pnlEl.textContent = `${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}`;
-  pnlEl.className = 'value ' + (pnl >= 0 ? 'up' : 'down');
-
-  // Holdings table
-  const tbody = document.getElementById('holdingsBody');
-  const symbols = Object.keys(holdings).filter(sym => holdings[sym].shares > 0);
-  if (symbols.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text-dim); text-align:center; padding:12px;">No positions yet</td></tr>';
-    return;
-  }
-  tbody.innerHTML = '';
-  symbols.forEach(sym => {
-    const h = holdings[sym];
-    const stock = stocks.find(s => s.symbol === sym);
-    const currentPrice = stock.prices[currentDay];
-    const value = h.shares * currentPrice;
-    const avgCost = h.totalCost / h.shares;
-    const pnlColor = currentPrice >= avgCost ? '#22c55e' : '#ef4444';
-    tbody.innerHTML += `
-      <tr>
-        <td style="font-weight:600; color:${stock.color}">${sym}</td>
-        <td>${h.shares}</td>
-        <td>$${avgCost.toFixed(2)}</td>
-        <td style="color:${pnlColor}">$${value.toFixed(2)}</td>
-      </tr>
-    `;
-  });
-}
-
-// ──────────────────────────────────────────────
-// Transaction log
-// ──────────────────────────────────────────────
-
-function updateTxLog() {
-  const log = document.getElementById('txLog');
-  if (transactions.length === 0) {
-    log.innerHTML = '<div style="color:var(--text-dim); text-align:center; padding:20px;">No transactions yet</div>';
-    return;
-  }
-  log.innerHTML = transactions.map(tx => `
-    <div class="tx-item">
-      <span class="tx-badge ${tx.type}">${tx.type.toUpperCase()}</span>
-      <span class="tx-detail">${tx.shares}× ${tx.symbol} · Day ${tx.day}</span>
-      <span class="tx-value">$${tx.total.toFixed(2)}</span>
-    </div>
-  `).join('');
-}
-
-// ──────────────────────────────────────────────
 // Playback
 // ──────────────────────────────────────────────
 
@@ -2337,13 +2273,42 @@ function stepForward() {
   if (currentDay >= totalDays) showCompletionModal();
 }
 
+function finishSimulation() {
+  if (isFinishing) return;
+  if (isPlaying) {
+    isPlaying = false;
+    clearInterval(playInterval);
+    document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
+  }
+  if (currentDay >= totalDays) {
+    showCompletionModal();
+    return;
+  }
+  isFinishing = true;
+  lockBotUI();
+  const runChunk = () => {
+    const targetDay = Math.min(currentDay + FINISH_CHUNK_SIZE, totalDays);
+    while (currentDay < targetDay) {
+      currentDay++;
+      if (botEnabled) runTradingScript();
+    }
+    if (currentDay < totalDays) {
+      requestAnimationFrame(runChunk);
+      return;
+    }
+    updateDay();
+    isFinishing = false;
+    showCompletionModal();
+  };
+  runChunk();
+}
+
 function updateDay() {
   document.getElementById('dayDisplay').textContent = `Day ${currentDay} / ${totalDays}`;
   refreshBotComparisonData();
   renderChart();
   renderBotPnlChart();
   updatePriceHeader();
-  updatePortfolioUI();
   updateMarketTable();
 }
 
@@ -2380,25 +2345,7 @@ function showCompletionModal() {
     document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
   }
 
-  let holdingsVal = 0;
-  stocks.forEach(s => {
-    if (holdings[s.symbol]) {
-      holdingsVal += holdings[s.symbol].shares * s.prices[currentDay];
-    }
-  });
-  const total  = cash + holdingsVal;
-  const pnl    = total - startingCapital;
-  const pnlPct = startingCapital !== 0 ? (pnl / startingCapital) * 100 : 0;
-
-  const retEl = document.getElementById('cmReturnValue');
-  retEl.textContent = (pnl >= 0 ? '+' : '-') + '$' + Math.abs(pnl).toFixed(2);
-  retEl.className = 'ret-value ' + (pnl >= 0 ? 'up' : 'down');
-  document.getElementById('cmReturnPct').textContent =
-    (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '% over ' + totalDays + ' days';
-
   document.getElementById('cmStartCapital').textContent = '$' + startingCapital.toFixed(2);
-  document.getElementById('cmFinalValue').textContent   = '$' + total.toFixed(2);
-  document.getElementById('cmCash').textContent         = '$' + cash.toFixed(2);
   document.getElementById('cmTransactions').textContent = String(transactions.length);
 
   // Stock performance table (sorted best to worst)
@@ -2432,6 +2379,7 @@ function showCompletionModal() {
   tableHTML += '</tbody></table>';
   rowsEl.innerHTML = tableHTML;
   refreshBotComparisonData();
+  renderCompletionBotPnlChart();
   renderBotComparison();
 
   document.getElementById('completionModal').classList.remove('hidden');
@@ -2917,8 +2865,6 @@ function runTradingScript() {
     holdings[symbol].totalCost += cost;
     transactions.unshift({ type: 'buy', symbol, shares, price, total: cost, day: currentDay });
     appendBotLog(`🤖 BUY  ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
-    updatePortfolioUI();
-    updateTxLog();
   };
 
   // sell(symbol, shares) — execute a market sell at today's price
@@ -2940,8 +2886,6 @@ function runTradingScript() {
     if (holdings[symbol].shares === 0) delete holdings[symbol];
     transactions.unshift({ type: 'sell', symbol, shares, price, total: proceeds, day: currentDay });
     appendBotLog(`🤖 SELL ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
-    updatePortfolioUI();
-    updateTxLog();
   };
 
   try {
