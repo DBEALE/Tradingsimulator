@@ -1800,6 +1800,15 @@ function getVisibleComparisonTrades(symbol, seriesLen) {
   return trades;
 }
 
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function renderChart() {
   const visible = stocks.filter(s => visibleStocks.has(s.symbol));
   if (visible.length === 0) return;
@@ -1932,8 +1941,11 @@ function renderChart() {
     });
 
     const compareTrades = getVisibleComparisonTrades(stock.symbol, prices.length);
+    const MARKER_OFFSET_SLOTS = 3;
+    const MARKER_OFFSET_CENTER = 1;
+    const MARKER_OFFSET_PX = 4;
     compareTrades.forEach((trade, idx) => {
-      const mx = xOf(trade.day) + ((idx % 3) - 1) * 4;
+      const mx = xOf(trade.day) + ((idx % MARKER_OFFSET_SLOTS) - MARKER_OFFSET_CENTER) * MARKER_OFFSET_PX;
       const my = yOf(prices[trade.day]);
       const isBuy = trade.type === 'buy';
       const markerHalf = 4;
@@ -2643,7 +2655,7 @@ function getSelectedBotStrategyKeys() {
 function getSelectedBotStrategies() {
   const select = document.getElementById('botStrategySelect');
   return getSelectedBotStrategyKeys().map(key => {
-    const option = select.querySelector(`option[value="${key}"]`);
+    const option = Array.from(select.options).find(opt => opt.value === key);
     return { key, name: option ? option.textContent : key, script: BOT_SCRIPTS[key] };
   });
 }
@@ -2720,6 +2732,7 @@ function simulateBotStrategy(meta) {
       const price = stock.prices[day];
       const proceeds = shares * price - tradingCost;
       const prevShares = simHoldings[symbol].shares;
+      if (prevShares <= 0) return;
       simCash += proceeds;
       simHoldings[symbol].shares -= shares;
       const ratio = shares / prevShares;
@@ -2784,7 +2797,12 @@ function updateBotTradeMarkerToggles() {
   list.innerHTML = '';
   botComparisonData.forEach(bot => {
     const lbl = document.createElement('label');
-    lbl.innerHTML = `<input type="checkbox" ${visibleBotTradeMarkers.has(bot.key) ? 'checked' : ''} onchange="toggleBotTradeMarker('${bot.key}', this.checked)"> ${bot.name}`;
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.checked = visibleBotTradeMarkers.has(bot.key);
+    input.onchange = () => toggleBotTradeMarker(bot.key, input.checked);
+    lbl.appendChild(input);
+    lbl.appendChild(document.createTextNode(' ' + bot.name));
     list.appendChild(lbl);
   });
 }
@@ -2818,7 +2836,7 @@ function renderBotComparison() {
   perf.forEach(p => {
     const col = p.pnl >= 0 ? '#22c55e' : '#ef4444';
     tableHTML += '<tr>' +
-      '<td style="font-weight:600">' + p.name + '</td>' +
+      '<td style="font-weight:600">' + escapeHtml(p.name) + '</td>' +
       '<td>$' + p.total.toFixed(2) + '</td>' +
       '<td style="color:' + col + '">' + (p.pnl >= 0 ? '+' : '-') + '$' + Math.abs(p.pnl).toFixed(2) + '</td>' +
       '</tr>';
@@ -2830,10 +2848,10 @@ function renderBotComparison() {
     const txList = bot.transactions.length === 0
       ? '<div style="color:var(--text-dim)">No transactions</div>'
       : bot.transactions.slice(-12).reverse().map(tx =>
-        `<div class="bot-tx-item"><span>${tx.type.toUpperCase()} ${tx.shares}× ${tx.symbol} · Day ${tx.day}</span><strong>$${tx.total.toFixed(2)}</strong></div>`
+        `<div class="bot-tx-item"><span>${tx.type.toUpperCase()} ${tx.shares}× ${escapeHtml(tx.symbol)} · Day ${tx.day}</span><strong>$${tx.total.toFixed(2)}</strong></div>`
       ).join('');
     return `<div class="bot-detail-card">
-      <div style="font-weight:700; margin-bottom:6px;">${bot.name}</div>
+      <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(bot.name)}</div>
       <div class="bot-detail-grid">
         <div><span>Cash</span><strong>$${bot.cash.toFixed(2)}</strong></div>
         <div><span>Holdings</span><strong>$${bot.holdingsVal.toFixed(2)}</strong></div>
