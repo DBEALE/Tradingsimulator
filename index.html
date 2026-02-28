@@ -93,6 +93,20 @@
       gap: 8px;
     }
 
+    .version-tag {
+      position: fixed;
+      top: 10px;
+      right: 12px;
+      z-index: 1000;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 3px 8px;
+    }
+
     .btn-icon {
       background: none;
       border: 1px solid var(--border);
@@ -1053,6 +1067,7 @@
     <button class="btn-icon" onclick="openDocs()" title="Documentation">📖 Docs</button>
   </div>
 </header>
+<div class="version-tag">v<span id="appVersion">0.1.0</span></div>
 
 <div class="container">
 
@@ -1363,6 +1378,9 @@
 // ──────────────────────────────────────────────
 // State
 // ──────────────────────────────────────────────
+const APP_VERSION = '0.1.0';
+document.getElementById('appVersion').textContent = APP_VERSION;
+
 let stocks = [];
 let currentDay = 0;
 let totalDays = 365;
