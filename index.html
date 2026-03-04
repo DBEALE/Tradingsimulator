@@ -1263,6 +1263,27 @@
           </div>
         </div>
 
+        <!-- Real-time Bot P&L table -->
+        <div class="card hidden" id="botPnlTableCard">
+          <h3>Bot P&amp;L</h3>
+          <div class="table-scroll">
+          <table class="holdings-table" id="botPnlTable">
+            <thead>
+              <tr>
+                <th>Bot</th>
+                <th>Cash</th>
+                <th>Holdings</th>
+                <th>Total</th>
+                <th>P&amp;L ↓</th>
+                <th>Return</th>
+                <th>Trades</th>
+              </tr>
+            </thead>
+            <tbody id="botPnlTableBody"></tbody>
+          </table>
+          </div>
+        </div>
+
       </div>
 
     </div>
@@ -2245,6 +2266,38 @@ function updateMarketTable() {
   });
 }
 
+function updateBotPnlTable() {
+  const card = document.getElementById('botPnlTableCard');
+  const tbody = document.getElementById('botPnlTableBody');
+
+  if (botComparisonData.length === 0 || currentDay < 1) {
+    card.classList.add('hidden');
+    tbody.innerHTML = '';
+    return;
+  }
+
+  card.classList.remove('hidden');
+  tbody.innerHTML = '';
+
+  const sorted = [...botComparisonData].sort((a, b) => b.pnl - a.pnl);
+  sorted.forEach(bot => {
+    const pnlColor = bot.pnl >= 0 ? '#22c55e' : '#ef4444';
+    const returnPct = startingCapital !== 0 ? (bot.pnl / startingCapital) * 100 : 0;
+    const pnlSign = bot.pnl >= 0 ? '+' : '-';
+    const retSign = returnPct >= 0 ? '+' : '-';
+    const row = document.createElement('tr');
+    row.innerHTML =
+      `<td style="font-weight:600">${escapeHtml(bot.name)}</td>` +
+      `<td>$${bot.cash.toFixed(2)}</td>` +
+      `<td>$${bot.holdingsVal.toFixed(2)}</td>` +
+      `<td>$${bot.total.toFixed(2)}</td>` +
+      `<td style="color:${pnlColor}">${pnlSign}$${Math.abs(bot.pnl).toFixed(2)}</td>` +
+      `<td style="color:${pnlColor}">${retSign}${Math.abs(returnPct).toFixed(2)}%</td>` +
+      `<td>${bot.transactions.length}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
 // ──────────────────────────────────────────────
 // Playback
 // ──────────────────────────────────────────────
@@ -2326,6 +2379,7 @@ function updateDay() {
   renderBotPnlChart();
   updatePriceHeader();
   updateMarketTable();
+  updateBotPnlTable();
 }
 
 function updateSpeed(val) {
