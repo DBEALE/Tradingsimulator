@@ -906,7 +906,7 @@
       border: 1px solid var(--border);
       border-radius: 16px;
       width: 100%;
-      max-width: 960px;
+      max-width: 680px;
       box-shadow: 0 24px 48px rgba(0,0,0,0.5);
     }
 
@@ -928,24 +928,24 @@
       padding: 20px 24px;
     }
 
-    .completion-body-columns {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 20px;
-    }
-
-    .completion-col {
-      min-width: 0;
+    .completion-tables-scroll {
+      max-height: 360px;
+      overflow-y: auto;
+      overflow-x: auto;
     }
 
     .cm-section-title {
       font-size: 0.85rem;
       font-weight: 600;
       color: var(--text-heading);
-      margin: 0 0 8px;
+      margin: 16px 0 8px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
+
+    .completion-tables-scroll > .cm-section-title:first-child { margin-top: 0; }
+
+    .cm-section-title + .completion-stock-rows { margin-bottom: 0; }
 
     .completion-stat-grid {
       display: grid;
@@ -1001,10 +1001,6 @@
 
     .completion-stock-rows {
       font-size: 0.8rem;
-      margin-bottom: 16px;
-      max-height: 280px;
-      overflow-y: auto;
-      overflow-x: auto;
     }
 
     .completion-chart-wrap {
@@ -1069,10 +1065,8 @@
 
     @media (max-width: 600px) {
       .completion-stat-grid { grid-template-columns: 1fr; }
-      .completion-body-columns { grid-template-columns: 1fr; }
       .completion-footer { padding: 0 16px 16px; }
       .completion-modal-body { padding: 16px; }
-      .bot-detail-grid { grid-template-columns: 1fr 1fr; }
     }
   </style>
 </head>
@@ -1391,32 +1385,28 @@
           <div class="c-value" id="cmTransactions">0</div>
         </div>
       </div>
-      <div class="completion-body-columns">
-        <div class="completion-col">
-          <h4 class="cm-section-title">Market Overview</h4>
-          <div class="completion-stock-rows" id="cmMarketRows">
-            <table>
-              <thead>
-                <tr>
-                  <th>Symbol</th><th>Price</th><th>Change</th><th>Change %</th><th>Day High</th><th>Day Low</th>
-                </tr>
-              </thead>
-              <tbody id="cmMarketTableBody"></tbody>
-            </table>
-          </div>
+      <div class="completion-tables-scroll">
+        <h4 class="cm-section-title">Market Overview</h4>
+        <div class="completion-stock-rows" id="cmMarketRows">
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th><th>Price</th><th>Change</th><th>Change %</th><th>Day High</th><th>Day Low</th>
+              </tr>
+            </thead>
+            <tbody id="cmMarketTableBody"></tbody>
+          </table>
         </div>
-        <div class="completion-col">
-          <h4 class="cm-section-title">Bot P&amp;L</h4>
-          <div class="completion-stock-rows" id="cmBotRows">
-            <table>
-              <thead>
-                <tr>
-                  <th>Bot</th><th>Cash</th><th>Holdings</th><th>Total</th><th>P&amp;L ↓</th><th>Return</th><th>Trades</th>
-                </tr>
-              </thead>
-              <tbody id="cmBotPnlTableBody"></tbody>
-            </table>
-          </div>
+        <h4 class="cm-section-title">Bot P&amp;L</h4>
+        <div class="completion-stock-rows" id="cmBotRows">
+          <table>
+            <thead>
+              <tr>
+                <th>Bot</th><th>Cash</th><th>Holdings</th><th>Total</th><th>P&amp;L ↓</th><th>Return</th><th>Trades</th>
+              </tr>
+            </thead>
+            <tbody id="cmBotPnlTableBody"></tbody>
+          </table>
         </div>
       </div>
     </div>
