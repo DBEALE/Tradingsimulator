@@ -586,7 +586,7 @@
 
     .bot-script {
       width: 100%;
-      height: 180px;
+      height: 300px;
       background: var(--bg-input);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -633,7 +633,7 @@
       .sim-controls { gap: 6px; }
       .sim-controls .btn { padding: 7px 10px; font-size: 0.8rem; }
       .day-display { width: 100%; margin-left: 0; margin-top: 4px; text-align: center; }
-      .bot-script { height: 140px; }
+      .bot-script { height: 200px; }
     }
 
     @media (max-width: 400px) {
@@ -877,7 +877,7 @@
 
     /* ── Disabled bot controls ── */
     .bot-script:disabled,
-    #botStrategySelect:disabled {
+    #botStrategyList input[type=checkbox]:disabled {
       opacity: 0.45;
       cursor: not-allowed;
     }
@@ -888,6 +888,94 @@
       font-style: italic;
       margin-top: 4px;
     }
+
+    /* ── Bot strategy checkbox list ── */
+    .bot-strategy-list {
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .bot-strategy-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.85rem;
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    .bot-strategy-item input[type=checkbox] {
+      accent-color: #2563eb;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .new-bot-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border-inner);
+    }
+
+    .new-bot-row input[type=text] {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      outline: none;
+    }
+
+    .new-bot-row input[type=text]:focus { border-color: #2563eb; }
+
+    .new-bot-row .btn {
+      padding: 5px 12px;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    /* ── Trades Blotter ── */
+    .blotter-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    .blotter-table th {
+      text-align: left;
+      color: var(--text-faint);
+      font-weight: 500;
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .blotter-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid var(--border-inner);
+      color: var(--text);
+    }
+
+    .blotter-table tr:last-child td { border-bottom: none; }
+
+    .blotter-scroll {
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .blotter-scroll::-webkit-scrollbar { width: 4px; }
+    .blotter-scroll::-webkit-scrollbar-track { background: var(--bg-input); }
+    .blotter-scroll::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
 
     /* ── Completion Modal ── */
     .completion-modal-overlay {
@@ -1106,13 +1194,13 @@
         </div>
         <div class="step-card">
           <div class="step-number">3</div>
-          <h3>Trade</h3>
-          <p>Click individual stock tabs to switch which stock is displayed on the chart. The Auto-Trading Bot executes a strategy automatically &mdash; configure it before starting the simulation.</p>
+          <h3>Trade &amp; Configure Bots</h3>
+          <p>Click individual stock tabs to switch which stock is displayed on the chart. Select bot strategies using checkboxes — each checked strategy runs as a comparison bot. You can also write a custom strategy and save it as a new bot.</p>
         </div>
         <div class="step-card">
           <div class="step-number">4</div>
           <h3>Monitor</h3>
-          <p>Watch the live chart, market overview, and bot analytics update as each simulated day passes.</p>
+          <p>Watch the live chart and bot analytics update as each simulated day passes. The live trades blotter below the bot P&amp;L panel shows all trades across every active bot.</p>
         </div>
         <div class="step-card">
           <div class="step-number">5</div>
@@ -1170,16 +1258,20 @@
         <label>Trading Cost per Order ($)</label>
         <input type="number" id="tradingCostInput" value="5.00" min="0" step="0.01" />
       </div>
-      <div class="field">
-        <label>Bot Strategy (multi-select for comparison)</label>
-        <select id="botStrategySelect" multiple size="6" onchange="loadBotStrategyFromSelection()">
-          <option value="sma" selected>Simple Moving Average (SMA)</option>
-          <option value="rsi">RSI (Relative Strength Index)</option>
-          <option value="momentum">Momentum</option>
-          <option value="buyhold">Buy &amp; Hold</option>
-          <option value="meanreversion">Mean Reversion</option>
-          <option value="graduateddca">Graduated DCA</option>
-        </select>
+      <div class="field" style="grid-column: 1 / -1;">
+        <label>Bot Strategies (check to include in simulation)</label>
+        <div class="bot-strategy-list" id="botStrategyList">
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="sma" checked onchange="onBotStrategyCheck(this)"> Simple Moving Average (SMA)</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="rsi" onchange="onBotStrategyCheck(this)"> RSI (Relative Strength Index)</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="momentum" onchange="onBotStrategyCheck(this)"> Momentum</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="buyhold" onchange="onBotStrategyCheck(this)"> Buy &amp; Hold</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="meanreversion" onchange="onBotStrategyCheck(this)"> Mean Reversion</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="graduateddca" onchange="onBotStrategyCheck(this)"> Graduated DCA</label>
+        </div>
+        <div class="new-bot-row" id="newBotRow">
+          <input type="text" id="newBotName" placeholder="New bot name…" />
+          <button class="btn btn-secondary" onclick="saveCustomBot()">+ Save Bot</button>
+        </div>
       </div>
       <div class="field">
         <label>&nbsp;</label>
@@ -1189,10 +1281,6 @@
     <div class="card" style="margin-top:20px;">
       <div class="bot-header">
         <h3 style="margin:0;">🤖 Auto-Trading Bot</h3>
-        <label class="bot-toggle">
-          <input type="checkbox" id="botEnabled" checked onchange="toggleBot(this.checked)" />
-          Enable
-        </label>
       </div>
       <p class="bot-api-hint">
         Write JavaScript that executes each simulation day when enabled. Available variables and functions:<br>
@@ -1224,9 +1312,6 @@
 
           <div class="chart-wrapper">
             <canvas id="priceChart"></canvas>
-          </div>
-          <div id="botTradeToggleWrap" class="bot-trade-toggle-wrap hidden">
-            <div id="botTradeToggleList" class="bot-trade-toggle-list"></div>
           </div>
           <div class="chart-wrapper pnl-chart-wrapper">
             <canvas id="botPnlChart"></canvas>
@@ -1288,6 +1373,27 @@
           </div>
         </div>
 
+        <!-- Live Trades Blotter -->
+        <div class="card hidden" id="blotterCard">
+          <h3>All Bot Trades</h3>
+          <div class="blotter-scroll">
+            <table class="blotter-table" id="blotterTable">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th>Bot</th>
+                  <th>Type</th>
+                  <th>Symbol</th>
+                  <th>Shares</th>
+                  <th>Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="blotterTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
     </div>
@@ -1322,7 +1428,7 @@
           <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), High Volatility, Dot-com Boom &amp; Bust, 2008 Financial Crisis, or COVID Crash &amp; Recovery.</td></tr>
           <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (1, 5, 10, 25, or 100).</td></tr>
           <tr><td><strong>Trading Cost</strong></td><td>Flat fee deducted from each buy or sell order (default $5.00).</td></tr>
-          <tr><td><strong>Bot Strategy</strong></td><td>Select one or more predefined bot strategies before starting the simulation.</td></tr>
+          <tr><td><strong>Bot Strategies</strong></td><td>Check one or more strategies to include in the simulation. Checking a strategy loads its script into the editor. You can also write and save a custom bot.</td></tr>
         </tbody>
       </table>
 
@@ -1330,14 +1436,14 @@
       <ul>
         <li>Click individual stock tabs to switch which stock is displayed on the chart.</li>
         <li><strong>Hover</strong> over the chart to see the exact price and any trades on that day.</li>
-        <li>Green triangles (▲) mark the active bot's <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
-        <li>Use the bot checkboxes beneath the chart to toggle comparison bot trade markers.</li>
+        <li>Green triangles (▲) mark a bot's <em>buy</em> events; red triangles (▼) mark <em>sell</em> events.</li>
         <li>The second chart shows <strong>daily P&amp;L per selected bot</strong>.</li>
+        <li>The <strong>All Bot Trades</strong> blotter below the P&amp;L panel lists every trade from every active bot in real time.</li>
         <li>Use the <strong>Speed</strong> slider to control simulation pace (1× – 10×).</li>
       </ul>
 
       <h3>Auto-Trading Bot</h3>
-      <p>Write a JavaScript snippet that runs automatically each simulation day. Enable or disable the bot with the <strong>Enable</strong> checkbox. Select one or more predefined strategies for comparison, or write your own active script.</p>
+      <p>Check the strategies you want to run using the <strong>Bot Strategies</strong> checkboxes. Checking a strategy loads its script into the editor. You can also write a custom script, give it a name, and click <strong>+ Save Bot</strong> to add it to the list. All checked bots run simultaneously during the simulation for comparison.</p>
 
       <h3>Bot API Reference</h3>
       <table>
@@ -1381,22 +1487,11 @@
           <div class="c-value" id="cmStartCapital">$0.00</div>
         </div>
         <div class="completion-stat">
-          <div class="c-label">Total Transactions</div>
-          <div class="c-value" id="cmTransactions">0</div>
+          <div class="c-label">Simulation Days</div>
+          <div class="c-value" id="cmSimDays">0</div>
         </div>
       </div>
       <div class="completion-tables-scroll">
-        <h4 class="cm-section-title">Market Overview</h4>
-        <div class="completion-stock-rows" id="cmMarketRows">
-          <table>
-            <thead>
-              <tr>
-                <th>Symbol</th><th>Price</th><th>Change</th><th>Change %</th><th>Day High</th><th>Day Low</th>
-              </tr>
-            </thead>
-            <tbody id="cmMarketTableBody"></tbody>
-          </table>
-        </div>
         <h4 class="cm-section-title">Bot P&amp;L</h4>
         <div class="completion-stock-rows" id="cmBotRows">
           <table>
@@ -1644,7 +1739,6 @@ function startSimulation() {
   attachChartHover();
   updateMarketTable();
   refreshBotComparisonData();
-  updateBotTradeMarkerToggles();
   renderBotPnlChart();
 
   document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
@@ -1654,8 +1748,6 @@ function startSimulation() {
   botLogEl.innerHTML = '';
   botLogEl.classList.add('hidden');
 
-  const botCheckbox = document.getElementById('botEnabled');
-  botCheckbox.checked = true;
   botEnabled = true;
 
   // Keep bot controls editable on day 0; lock once simulation advances.
@@ -2314,6 +2406,51 @@ function updateBotPnlTable() {
   });
 }
 
+function updateBlotter() {
+  const card = document.getElementById('blotterCard');
+  const tbody = document.getElementById('blotterTableBody');
+
+  if (botComparisonData.length === 0 || currentDay < 1) {
+    card.classList.add('hidden');
+    tbody.innerHTML = '';
+    return;
+  }
+
+  // Collect all trades from all bots
+  const allTrades = [];
+  botComparisonData.forEach(bot => {
+    bot.transactions.forEach(tx => {
+      allTrades.push({ ...tx, botName: bot.name });
+    });
+  });
+
+  if (allTrades.length === 0) {
+    card.classList.add('hidden');
+    tbody.innerHTML = '';
+    return;
+  }
+
+  // Sort by day descending (newest first)
+  allTrades.sort((a, b) => b.day - a.day);
+
+  card.classList.remove('hidden');
+  tbody.innerHTML = '';
+  allTrades.forEach(tx => {
+    const isBuy = tx.type === 'buy';
+    const color = isBuy ? '#22c55e' : '#ef4444';
+    const row = document.createElement('tr');
+    row.innerHTML =
+      `<td>${tx.day}</td>` +
+      `<td style="font-weight:600">${escapeHtml(tx.botName)}</td>` +
+      `<td style="color:${color};font-weight:600">${tx.type.toUpperCase()}</td>` +
+      `<td>${escapeHtml(tx.symbol)}</td>` +
+      `<td>${tx.shares}</td>` +
+      `<td>$${tx.price.toFixed(2)}</td>` +
+      `<td>$${Math.abs(tx.total).toFixed(2)}</td>`;
+    tbody.appendChild(row);
+  });
+}
+
 // ──────────────────────────────────────────────
 // Playback
 // ──────────────────────────────────────────────
@@ -2396,6 +2533,7 @@ function updateDay() {
   updatePriceHeader();
   updateMarketTable();
   updateBotPnlTable();
+  updateBlotter();
 }
 
 function updateSpeed(val) {
@@ -2432,29 +2570,7 @@ function showCompletionModal() {
   }
 
   document.getElementById('cmStartCapital').textContent = '$' + startingCapital.toFixed(2);
-  document.getElementById('cmTransactions').textContent = String(transactions.length);
-
-  // Market overview table (final day data)
-  const cmMarketBody = document.getElementById('cmMarketTableBody');
-  cmMarketBody.innerHTML = '';
-  stocks.forEach(s => {
-    const price = s.prices[currentDay];
-    const prev  = s.prices[Math.max(0, currentDay - 1)];
-    const change    = price - prev;
-    const changePct = prev !== 0 ? (change / prev) * 100 : 0;
-    const high = Math.max(prev, price);
-    const low  = Math.min(prev, price);
-    const color = change >= 0 ? '#22c55e' : '#ef4444';
-    const row = document.createElement('tr');
-    row.innerHTML =
-      `<td style="font-weight:600;color:${s.color}">${s.symbol}</td>` +
-      `<td>$${price.toFixed(2)}</td>` +
-      `<td style="color:${color}">${change >= 0 ? '+' : ''}${change.toFixed(2)}</td>` +
-      `<td style="color:${color}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>` +
-      `<td>$${high.toFixed(2)}</td>` +
-      `<td>$${low.toFixed(2)}</td>`;
-    cmMarketBody.appendChild(row);
-  });
+  document.getElementById('cmSimDays').textContent = String(totalDays);
 
   refreshBotComparisonData();
   renderBotComparison();
@@ -2474,9 +2590,10 @@ function closeCompletionModal() {
 
 function lockBotUI() {
   const textarea = document.getElementById('botScript');
-  const select   = document.getElementById('botStrategySelect');
   textarea.disabled = true;
-  select.disabled   = true;
+  document.querySelectorAll('#botStrategyList input[type=checkbox]').forEach(cb => cb.disabled = true);
+  const saveBtn = document.querySelector('#newBotRow .btn');
+  if (saveBtn) saveBtn.disabled = true;
   if (!document.getElementById('botLockedNotice')) {
     const notice = document.createElement('p');
     notice.id = 'botLockedNotice';
@@ -2488,9 +2605,10 @@ function lockBotUI() {
 
 function unlockBotUI() {
   const textarea = document.getElementById('botScript');
-  const select   = document.getElementById('botStrategySelect');
   textarea.disabled = false;
-  select.disabled   = false;
+  document.querySelectorAll('#botStrategyList input[type=checkbox]').forEach(cb => cb.disabled = false);
+  const saveBtn = document.querySelector('#newBotRow .btn');
+  if (saveBtn) saveBtn.disabled = false;
   const notice = document.getElementById('botLockedNotice');
   if (notice) notice.remove();
 }
@@ -2666,36 +2784,72 @@ if (day === 1) {
 
 const DEFAULT_BOT_SCRIPT = BOT_SCRIPTS.sma;
 
+// Custom bots defined by the user: { key: { name, script } }
+let customBots = {};
+
 function loadBotStrategy(key) {
   if (BOT_SCRIPTS[key]) {
     document.getElementById('botScript').value = BOT_SCRIPTS[key];
+  } else if (customBots[key]) {
+    document.getElementById('botScript').value = customBots[key].script;
   }
 }
 
 function getSelectedBotStrategyKeys() {
-  const select = document.getElementById('botStrategySelect');
-  return Array.from(select.selectedOptions).map(opt => opt.value).filter(key => BOT_SCRIPTS[key]);
+  return Array.from(document.querySelectorAll('#botStrategyList input[type=checkbox]:checked'))
+    .map(cb => cb.value)
+    .filter(key => BOT_SCRIPTS[key] || customBots[key]);
 }
 
 function getSelectedBotStrategies() {
-  const select = document.getElementById('botStrategySelect');
   return getSelectedBotStrategyKeys().map(key => {
-    const option = Array.from(select.options).find(opt => opt.value === key);
-    return { key, name: option ? option.textContent : key, script: BOT_SCRIPTS[key] };
+    if (customBots[key]) return { key, name: customBots[key].name, script: customBots[key].script };
+    const label = document.querySelector(`#botStrategyList input[value="${CSS.escape(key)}"]`);
+    const name = label ? label.closest('label').textContent.trim() : key;
+    return { key, name, script: BOT_SCRIPTS[key] };
   });
 }
 
-function loadBotStrategyFromSelection() {
-  const selected = getSelectedBotStrategies();
-  if (selected.length > 0) loadBotStrategy(selected[0].key);
+function onBotStrategyCheck(checkbox) {
+  if (checkbox.checked) {
+    loadBotStrategy(checkbox.value);
+  }
   refreshBotComparisonData();
-  showBotTradeMarkers = true;
-  visibleBotTradeMarkers = new Set(selected.map(s => s.key));
-  updateBotTradeMarkerToggles();
   if (stocks.length > 0) {
     renderChart();
     renderBotPnlChart();
   }
+}
+
+function saveCustomBot() {
+  const nameInput = document.getElementById('newBotName');
+  const script = document.getElementById('botScript').value.trim();
+  const name = nameInput.value.trim();
+  if (!name) { showNotification('Please enter a name for the new bot.'); return; }
+  if (!script) { showNotification('Please write a script in the bot editor before saving.'); return; }
+
+  // Generate a unique key
+  const key = 'custom_' + name.replace(/\W+/g, '_').toLowerCase() + '_' + Date.now();
+  customBots[key] = { name, script };
+
+  // Add checkbox to the list
+  const list = document.getElementById('botStrategyList');
+  const lbl = document.createElement('label');
+  lbl.className = 'bot-strategy-item';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.name = 'botStrategy';
+  cb.value = key;
+  cb.checked = true;
+  cb.onchange = () => onBotStrategyCheck(cb);
+  lbl.appendChild(cb);
+  lbl.appendChild(document.createTextNode(' ' + name));
+  list.appendChild(lbl);
+
+  nameInput.value = '';
+  showNotification(`Bot "${name}" saved.`);
+  refreshBotComparisonData();
+  if (stocks.length > 0) { renderChart(); renderBotPnlChart(); }
 }
 
 function calculateHoldingsValue(holdingsMap, day) {
@@ -2798,50 +2952,8 @@ function simulateBotStrategy(meta) {
 function refreshBotComparisonData() {
   const selected = getSelectedBotStrategies();
   botComparisonData = selected.map(meta => simulateBotStrategy(meta));
-
-  const validKeys = new Set(botComparisonData.map(b => b.key));
-  visibleBotTradeMarkers.forEach(k => { if (!validKeys.has(k)) visibleBotTradeMarkers.delete(k); });
-  if (showBotTradeMarkers && visibleBotTradeMarkers.size === 0) {
-    botComparisonData.forEach(b => visibleBotTradeMarkers.add(b.key));
-  }
-}
-
-function updateBotTradeMarkerToggles() {
-  const wrap = document.getElementById('botTradeToggleWrap');
-  const list = document.getElementById('botTradeToggleList');
-
-  if (botComparisonData.length === 0) {
-    wrap.classList.add('hidden');
-    list.innerHTML = '';
-    return;
-  }
-
-  wrap.classList.remove('hidden');
-  list.innerHTML = '';
-  botComparisonData.forEach(bot => {
-    const lbl = document.createElement('label');
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = visibleBotTradeMarkers.has(bot.key);
-    input.onchange = () => toggleBotTradeMarker(bot.key, input.checked);
-    lbl.appendChild(input);
-    lbl.appendChild(document.createTextNode(' ' + bot.name));
-    list.appendChild(lbl);
-  });
-}
-
-function toggleAllBotTradeMarkers(enabled) {
-  showBotTradeMarkers = enabled;
-  visibleBotTradeMarkers.clear();
-  if (enabled) botComparisonData.forEach(bot => visibleBotTradeMarkers.add(bot.key));
-  updateBotTradeMarkerToggles();
-  renderChart();
-}
-
-function toggleBotTradeMarker(botKey, enabled) {
-  if (enabled) visibleBotTradeMarkers.add(botKey);
-  else visibleBotTradeMarkers.delete(botKey);
-  renderChart();
+  // Always show all bot trade markers
+  visibleBotTradeMarkers = new Set(botComparisonData.map(b => b.key));
 }
 
 function renderBotComparison() {
@@ -2871,10 +2983,6 @@ function renderBotComparison() {
       `<td>${bot.transactions.length}</td>`;
     tbody.appendChild(row);
   });
-}
-
-function toggleBot(enabled) {
-  botEnabled = enabled;
 }
 
 /**
@@ -2974,7 +3082,6 @@ function appendBotLog(msg) {
 
 // Initialise the script textarea with the default strategy
 document.getElementById('botScript').value = DEFAULT_BOT_SCRIPT;
-loadBotStrategyFromSelection();
 
 
 // ──────────────────────────────────────────────
