@@ -906,7 +906,7 @@
       border: 1px solid var(--border);
       border-radius: 16px;
       width: 100%;
-      max-width: 820px;
+      max-width: 960px;
       box-shadow: 0 24px 48px rgba(0,0,0,0.5);
     }
 
@@ -936,6 +936,15 @@
 
     .completion-col {
       min-width: 0;
+    }
+
+    .cm-section-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-heading);
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
     .completion-stat-grid {
@@ -995,6 +1004,7 @@
       margin-bottom: 16px;
       max-height: 280px;
       overflow-y: auto;
+      overflow-x: auto;
     }
 
     .completion-chart-wrap {
@@ -1371,26 +1381,42 @@
       <button class="modal-close" onclick="closeCompletionModal()" aria-label="Close">&#10005;</button>
     </div>
     <div class="completion-modal-body">
+      <div class="completion-stat-grid" style="margin-bottom:18px;">
+        <div class="completion-stat">
+          <div class="c-label">Starting Capital</div>
+          <div class="c-value" id="cmStartCapital">$0.00</div>
+        </div>
+        <div class="completion-stat">
+          <div class="c-label">Total Transactions</div>
+          <div class="c-value" id="cmTransactions">0</div>
+        </div>
+      </div>
       <div class="completion-body-columns">
         <div class="completion-col">
-          <div class="completion-stat-grid">
-            <div class="completion-stat">
-              <div class="c-label">Starting Capital</div>
-              <div class="c-value" id="cmStartCapital">$0.00</div>
-            </div>
-            <div class="completion-stat">
-              <div class="c-label">Total Transactions</div>
-              <div class="c-value" id="cmTransactions">0</div>
-            </div>
+          <h4 class="cm-section-title">Market Overview</h4>
+          <div class="completion-stock-rows" id="cmMarketRows">
+            <table>
+              <thead>
+                <tr>
+                  <th>Symbol</th><th>Price</th><th>Change</th><th>Change %</th><th>Day High</th><th>Day Low</th>
+                </tr>
+              </thead>
+              <tbody id="cmMarketTableBody"></tbody>
+            </table>
           </div>
-          <div class="completion-stock-rows" id="cmStockRows"></div>
         </div>
         <div class="completion-col">
-          <div class="completion-chart-wrap">
-            <canvas id="cmBotPnlChart"></canvas>
+          <h4 class="cm-section-title">Bot P&amp;L</h4>
+          <div class="completion-stock-rows" id="cmBotRows">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bot</th><th>Cash</th><th>Holdings</th><th>Total</th><th>P&amp;L ↓</th><th>Return</th><th>Trades</th>
+                </tr>
+              </thead>
+              <tbody id="cmBotPnlTableBody"></tbody>
+            </table>
           </div>
-          <div class="completion-stock-rows" id="cmBotRows"></div>
-          <div class="completion-stock-rows" id="cmBotDetailRows"></div>
         </div>
       </div>
     </div>
@@ -2418,38 +2444,29 @@ function showCompletionModal() {
   document.getElementById('cmStartCapital').textContent = '$' + startingCapital.toFixed(2);
   document.getElementById('cmTransactions').textContent = String(transactions.length);
 
-  // Stock performance table (sorted best to worst)
-  const stockPerf = stocks.map(s => {
-    const startP  = s.prices[0];
-    const endP    = s.prices[currentDay];
-    const chgPct  = startP !== 0 ? (endP - startP) / startP * 100 : 0;
-    return { symbol: s.symbol, color: s.color, startP, endP, chgPct };
-  }).sort((a, b) => b.chgPct - a.chgPct);
-
-  let rowsToShow = stockPerf;
-  if (stockPerf.length > 10) {
-    rowsToShow = [...stockPerf.slice(0, 5), { divider: true }, ...stockPerf.slice(-5)];
-  }
-
-  const rowsEl = document.getElementById('cmStockRows');
-  let tableHTML = '<table><thead><tr><th>Symbol</th><th>Start</th><th>End</th><th>Return</th></tr></thead><tbody>';
-  rowsToShow.forEach(r => {
-    if (r.divider) {
-      tableHTML += '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:3px;">&#183;&#183;&#183;</td></tr>';
-    } else {
-      const col = r.chgPct >= 0 ? '#22c55e' : '#ef4444';
-      tableHTML += '<tr>' +
-        '<td style="font-weight:600;color:' + r.color + '">' + r.symbol + '</td>' +
-        '<td>$' + r.startP.toFixed(2) + '</td>' +
-        '<td>$' + r.endP.toFixed(2) + '</td>' +
-        '<td style="color:' + col + '">' + (r.chgPct >= 0 ? '+' : '') + r.chgPct.toFixed(1) + '%</td>' +
-        '</tr>';
-    }
+  // Market overview table (final day data)
+  const cmMarketBody = document.getElementById('cmMarketTableBody');
+  cmMarketBody.innerHTML = '';
+  stocks.forEach(s => {
+    const price = s.prices[currentDay];
+    const prev  = s.prices[Math.max(0, currentDay - 1)];
+    const change    = price - prev;
+    const changePct = prev !== 0 ? (change / prev) * 100 : 0;
+    const high = Math.max(prev, price);
+    const low  = Math.min(prev, price);
+    const color = change >= 0 ? '#22c55e' : '#ef4444';
+    const row = document.createElement('tr');
+    row.innerHTML =
+      `<td style="font-weight:600;color:${s.color}">${s.symbol}</td>` +
+      `<td>$${price.toFixed(2)}</td>` +
+      `<td style="color:${color}">${change >= 0 ? '+' : ''}${change.toFixed(2)}</td>` +
+      `<td style="color:${color}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>` +
+      `<td>$${high.toFixed(2)}</td>` +
+      `<td>$${low.toFixed(2)}</td>`;
+    cmMarketBody.appendChild(row);
   });
-  tableHTML += '</tbody></table>';
-  rowsEl.innerHTML = tableHTML;
+
   refreshBotComparisonData();
-  renderCompletionBotPnlChart();
   renderBotComparison();
 
   document.getElementById('completionModal').classList.remove('hidden');
@@ -2838,45 +2855,32 @@ function toggleBotTradeMarker(botKey, enabled) {
 }
 
 function renderBotComparison() {
-  const rowsEl = document.getElementById('cmBotRows');
-  const detailEl = document.getElementById('cmBotDetailRows');
+  const tbody = document.getElementById('cmBotPnlTableBody');
+  if (!tbody) return;
+
   if (botComparisonData.length === 0) {
-    rowsEl.innerHTML = '';
-    detailEl.innerHTML = '';
+    tbody.innerHTML = '';
     return;
   }
 
-  const perf = [...botComparisonData].sort((a, b) => b.pnl - a.pnl);
-
-  let tableHTML = '<table><thead><tr><th>Bot</th><th>Final Value</th><th>P&amp;L</th></tr></thead><tbody>';
-  perf.forEach(p => {
-    const col = p.pnl >= 0 ? '#22c55e' : '#ef4444';
-    tableHTML += '<tr>' +
-      '<td style="font-weight:600">' + escapeHtml(p.name) + '</td>' +
-      '<td>$' + p.total.toFixed(2) + '</td>' +
-      '<td style="color:' + col + '">' + (p.pnl >= 0 ? '+' : '-') + '$' + Math.abs(p.pnl).toFixed(2) + '</td>' +
-      '</tr>';
+  const sorted = [...botComparisonData].sort((a, b) => b.pnl - a.pnl);
+  tbody.innerHTML = '';
+  sorted.forEach(bot => {
+    const pnlColor = bot.pnl >= 0 ? '#22c55e' : '#ef4444';
+    const returnPct = startingCapital !== 0 ? (bot.pnl / startingCapital) * 100 : 0;
+    const pnlSign = bot.pnl >= 0 ? '+' : '-';
+    const retSign = returnPct >= 0 ? '+' : '-';
+    const row = document.createElement('tr');
+    row.innerHTML =
+      `<td style="font-weight:600">${escapeHtml(bot.name)}</td>` +
+      `<td>$${bot.cash.toFixed(2)}</td>` +
+      `<td>$${bot.holdingsVal.toFixed(2)}</td>` +
+      `<td>$${bot.total.toFixed(2)}</td>` +
+      `<td style="color:${pnlColor}">${pnlSign}$${Math.abs(bot.pnl).toFixed(2)}</td>` +
+      `<td style="color:${pnlColor}">${retSign}${Math.abs(returnPct).toFixed(2)}%</td>` +
+      `<td>${bot.transactions.length}</td>`;
+    tbody.appendChild(row);
   });
-  tableHTML += '</tbody></table>';
-  rowsEl.innerHTML = tableHTML;
-
-  detailEl.innerHTML = perf.map(bot => {
-    const txList = bot.transactions.length === 0
-      ? '<div style="color:var(--text-dim)">No transactions</div>'
-      : bot.transactions.slice(-12).reverse().map(tx =>
-        `<div class="bot-tx-item"><span>${tx.type.toUpperCase()} ${tx.shares}× ${escapeHtml(tx.symbol)} · Day ${tx.day}</span><strong>$${tx.total.toFixed(2)}</strong></div>`
-      ).join('');
-    return `<div class="bot-detail-card">
-      <div style="font-weight:700; margin-bottom:6px;">${escapeHtml(bot.name)}</div>
-      <div class="bot-detail-grid">
-        <div><span>Cash</span><strong>$${bot.cash.toFixed(2)}</strong></div>
-        <div><span>Holdings</span><strong>$${bot.holdingsVal.toFixed(2)}</strong></div>
-        <div><span>Total</span><strong>$${bot.total.toFixed(2)}</strong></div>
-        <div><span>P&amp;L</span><strong style="color:${bot.pnl >= 0 ? '#22c55e' : '#ef4444'}">${bot.pnl >= 0 ? '+' : '-'}$${Math.abs(bot.pnl).toFixed(2)}</strong></div>
-      </div>
-      <div class="bot-tx-list">${txList}</div>
-    </div>`;
-  }).join('');
 }
 
 function toggleBot(enabled) {
