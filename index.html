@@ -605,26 +605,95 @@
 
     /* ── Mobile responsive ── */
     @media (max-width: 600px) {
-      header { padding: 10px 16px; gap: 8px; }
+      header { padding: 10px 12px; gap: 6px; }
       header h1 { font-size: 1.1rem; }
-      .container { padding: 16px 12px; }
-      .setup-panel { padding: 16px; }
+      header span.badge { font-size: 0.65rem; padding: 2px 6px; }
+      .btn-icon { padding: 7px 9px; font-size: 0.8rem; }
+      .container { padding: 12px 10px; }
+      .setup-panel { padding: 14px; }
       .setup-grid { grid-template-columns: 1fr; }
-      .card { padding: 14px; }
-      .chart-wrapper { height: 220px; }
+      .card { padding: 12px; }
+      .chart-wrapper { height: 200px; }
+      .pnl-chart-wrapper { height: 130px; }
       .price-value { font-size: 1.5rem; }
-      .sim-controls { gap: 6px; }
-      .sim-controls .btn { padding: 7px 10px; font-size: 0.8rem; }
-      .day-display { width: 100%; margin-left: 0; margin-top: 4px; text-align: center; }
-      .bot-script { height: 200px; }
+
+      /* Stock tabs: horizontal scroll so many tabs don't stack vertically */
+      .stock-tabs {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        max-height: none;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        scrollbar-width: none;
+      }
+      .stock-tabs::-webkit-scrollbar { display: none; }
+      .tab-btn { flex-shrink: 0; padding: 5px 10px; font-size: 0.8rem; }
+
+      /* Sim controls: 2-column grid so buttons don't crowd or overflow */
+      .sim-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .sim-controls .btn { padding: 10px 8px; font-size: 0.82rem; }
+      .day-display { grid-column: 1 / -1; width: auto; margin-left: 0; margin-top: 0; text-align: center; }
+
+      .speed-row { margin-top: 10px; }
+      .bot-script { height: 200px; font-size: 0.78rem; }
+
+      /* Landing page */
+      .landing { margin: 24px auto; }
+      .landing-hero h2 { font-size: 1.5rem; }
+      .landing-hero p { font-size: 0.95rem; }
+      .btn-lg { padding: 12px 24px; }
+      .landing-steps { gap: 12px; }
+      .step-card { padding: 16px 14px; }
+
+      /* Market Overview: hide Day High / Day Low on mobile */
+      #marketTable th:nth-child(5),
+      #marketTable td:nth-child(5),
+      #marketTable th:nth-child(6),
+      #marketTable td:nth-child(6) { display: none; }
+
+      /* Bot P&L table: hide Cash and Holdings columns to save space */
+      #botPnlTable th:nth-child(2),
+      #botPnlTable td:nth-child(2),
+      #botPnlTable th:nth-child(3),
+      #botPnlTable td:nth-child(3) { display: none; }
+
+      /* Blotter: hide Price column to save space */
+      #blotterTable th:nth-child(6),
+      #blotterTable td:nth-child(6) { display: none; }
+
+      /* Bot detail grid in completion modal: 2 columns instead of 4 */
+      .bot-detail-grid { grid-template-columns: 1fr 1fr; }
+
+      /* Notification: full width pinned to bottom edge on mobile */
+      #notification {
+        bottom: 0;
+        right: 0;
+        left: 0;
+        max-width: 100%;
+        border-radius: 12px 12px 0 0;
+        border-bottom: none;
+      }
     }
 
     @media (max-width: 400px) {
       header h1 { font-size: 1rem; }
+      header span.badge { display: none; }
       .portfolio-summary { grid-template-columns: 1fr; }
       .stat-box .value { font-size: 1rem; }
       .price-value { font-size: 1.3rem; }
-      .card { padding: 12px; }
+      .card { padding: 10px; }
+      .sim-controls .btn { font-size: 0.78rem; padding: 9px 6px; }
+
+      /* Market Overview: also hide Change column at very small widths */
+      #marketTable th:nth-child(3),
+      #marketTable td:nth-child(3) { display: none; }
     }
 
     /* ── Horizontal-scroll wrapper for wide tables on mobile ── */
@@ -1136,8 +1205,16 @@
 
     @media (max-width: 600px) {
       .completion-stat-grid { grid-template-columns: 1fr; }
-      .completion-footer { padding: 0 16px 16px; }
-      .completion-modal-body { padding: 16px; }
+      .completion-footer { padding: 0 14px 14px; gap: 8px; }
+      .completion-modal-body { padding: 14px; }
+      .completion-tables-scroll { max-height: 220px; }
+      .bot-detail-grid { grid-template-columns: 1fr 1fr; }
+      .completion-return-box .ret-value { font-size: 1.8rem; }
+      /* Completion modal Bot P&L table: hide Cash and Holdings columns */
+      #cmBotRows th:nth-child(2),
+      #cmBotRows td:nth-child(2),
+      #cmBotRows th:nth-child(3),
+      #cmBotRows td:nth-child(3) { display: none; }
     }
   </style>
 </head>
