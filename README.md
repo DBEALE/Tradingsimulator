@@ -24,6 +24,7 @@ A browser-based stock market simulator that lets you practise trading strategies
 - **Bot API** – Bot scripts have access to `prices`, `holdings`, `cash`, `day`, `totalDays`, `buy(symbol, shares)`, `sell(symbol, shares)`, and `priceHistory(symbol, n)`.
 - **Email notifications** – Optional portfolio updates delivered via [EmailJS](https://www.emailjs.com) (no backend required). Configure notification frequency (every 30, 60, or 90 simulation days) or receive only a final summary.
 - **Dark / Light theme** – Toggle between dark and light themes; preference is saved in `localStorage`.
+- **Mobile-optimised layout** – On screens ≤ 600 px the UI adapts automatically: a stock search/filter box appears above the tab strip when more than 10 stocks are loaded (critical for 25 or 100 stocks), the Market Overview table is height-constrained so it doesn't dominate the page, the price chart responds to tap and swipe gestures for the tooltip, and the active tab is always scrolled into view.
 - **Build version label** – A version tag is always visible at the top-right of the screen and is auto-incremented (patch version) by GitHub Actions on each push/build.
 - **Fully client-side** – A single `index.html` file with no build step, no server, and no dependencies beyond EmailJS (loaded from CDN, optional).
 
