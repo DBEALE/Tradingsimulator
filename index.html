@@ -324,6 +324,7 @@
       display: block;
       width: 100% !important;
       height: 100% !important;
+      touch-action: none; /* let JS handle all touch gestures on the chart canvas */
     }
 
     .pnl-chart-wrapper {
@@ -698,6 +699,39 @@
 
     /* ── Horizontal-scroll wrapper for wide tables on mobile ── */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* ── Stock search filter (mobile with many stocks) ── */
+    .stock-search-wrap { display: none; }
+
+    @media (max-width: 600px) {
+      .stock-search-wrap.visible {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+      #stockSearchInput {
+        width: 100%;
+        background: var(--bg-input);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text);
+        padding: 7px 10px;
+        font-size: 0.85rem;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      #stockSearchInput:focus { border-color: #2563eb; }
+
+      /* Market overview: scrollable when many rows */
+      #marketTableWrap {
+        max-height: 260px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      #marketTableWrap::-webkit-scrollbar { width: 4px; }
+      #marketTableWrap::-webkit-scrollbar-track { background: var(--bg-input); }
+      #marketTableWrap::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 4px; }
+    }
 
         /* ── Documentation Modal ── */
     .modal-overlay {
@@ -1362,6 +1396,9 @@
       <!-- Left: Chart -->
       <div>
         <div class="card" style="margin-bottom:20px;">
+          <div class="stock-search-wrap" id="stockSearchWrap">
+            <input type="text" id="stockSearchInput" placeholder="🔍 Search stocks…" oninput="filterStockTabs(this.value)" autocomplete="off" aria-label="Search stocks" />
+          </div>
           <div class="stock-tabs" id="stockTabs"></div>
 
           <div class="price-header">
@@ -1395,7 +1432,7 @@
         <!-- Market Overview mini table -->
         <div class="card">
           <h3>Market Overview</h3>
-          <div class="table-scroll">
+          <div class="table-scroll" id="marketTableWrap">
           <table class="holdings-table" id="marketTable">
             <thead>
               <tr>
@@ -1604,6 +1641,8 @@ let showBotTradeMarkers = true;
 
 const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
 const FINISH_CHUNK_SIZE = 50;
+const STOCK_SEARCH_THRESHOLD = 10; // show mobile search filter when stock count exceeds this
+const TOUCH_TOOLTIP_HIDE_MS = 2500; // ms before the touch tooltip auto-hides after touchend
 
 const STOCK_TEMPLATES = [
   { name: 'AlphaTech',   symbol: 'ATEC', basePrice: 150, volatility: 0.018, drift: 0.0003 },
@@ -1850,6 +1889,13 @@ function buildStockTabs() {
     btn.onclick = () => toggleStockVisibility(s.symbol);
     tabs.appendChild(btn);
   });
+  // Show the stock search filter on mobile when there are many stocks
+  const searchWrap = document.getElementById('stockSearchWrap');
+  if (searchWrap) {
+    searchWrap.classList.toggle('visible', stocks.length > STOCK_SEARCH_THRESHOLD);
+    const input = document.getElementById('stockSearchInput');
+    if (input) input.value = '';
+  }
 }
 
 function toggleStockVisibility(symbol) {
@@ -1903,6 +1949,33 @@ function updateTabStyles() {
       b.style.background = '';
       b.style.borderColor = '';
     }
+  });
+  // Scroll the active tab into view within the horizontal tabs strip (important on mobile)
+  const activeBtn = document.querySelector('#stockTabs .tab-btn.active');
+  if (activeBtn) {
+    const container = document.getElementById('stockTabs');
+    if (container) {
+      const btnLeft = activeBtn.offsetLeft;
+      const btnRight = btnLeft + activeBtn.offsetWidth;
+      const cLeft = container.scrollLeft;
+      const cRight = cLeft + container.clientWidth;
+      if (btnLeft < cLeft) {
+        container.scrollLeft = btnLeft - 8;
+      } else if (btnRight > cRight) {
+        container.scrollLeft = btnRight - container.clientWidth + 8;
+      }
+    }
+  }
+}
+
+function filterStockTabs(query) {
+  const q = query.trim().toLowerCase();
+  document.querySelectorAll('#stockTabs .tab-btn').forEach(btn => {
+    const symbol = (btn.dataset.symbol || '').toLowerCase();
+    const stock = stocks.find(s => s.symbol === btn.dataset.symbol);
+    const name = stock ? stock.name.toLowerCase() : '';
+    const match = !q || symbol.includes(q) || name.includes(q);
+    btn.style.display = match ? '' : 'none';
   });
 }
 
@@ -2358,23 +2431,52 @@ function roundRect(ctx, x, y, w, h, r) {
 
 function attachChartHover() {
   const canvas = document.getElementById('priceChart');
-  canvas.onmousemove = e => {
-    if (currentDay < 1) return;
+
+  const getChartDay = (clientX) => {
+    if (currentDay < 1) return -1;
     const visible = stocks.filter(s => visibleStocks.has(s.symbol));
-    if (visible.length === 0) return;
+    if (visible.length === 0) return -1;
     const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
+    const x = clientX - rect.left;
     const PAD_LEFT = 60, PAD_RIGHT = 18;
     const plotW = rect.width - PAD_LEFT - PAD_RIGHT;
     const seriesLen = visible[0].prices.slice(0, currentDay + 1).length;
-    const idx = Math.round(((mouseX - PAD_LEFT) / plotW) * (seriesLen - 1));
-    chartTooltipDay = Math.max(0, Math.min(seriesLen - 1, idx));
+    return Math.max(0, Math.min(seriesLen - 1, Math.round(((x - PAD_LEFT) / plotW) * (seriesLen - 1))));
+  };
+
+  canvas.onmousemove = e => {
+    const day = getChartDay(e.clientX);
+    if (day < 0) return;
+    chartTooltipDay = day;
     renderChart();
   };
   canvas.onmouseleave = () => {
     chartTooltipDay = -1;
     renderChart();
   };
+
+  // Touch support for mobile
+  let touchEndTimer = null;
+  canvas.addEventListener('touchstart', e => {
+    if (touchEndTimer) { clearTimeout(touchEndTimer); touchEndTimer = null; }
+    const day = getChartDay(e.touches[0].clientX);
+    if (day < 0) return;
+    chartTooltipDay = day;
+    renderChart();
+  }, { passive: true });
+  canvas.addEventListener('touchmove', e => {
+    const day = getChartDay(e.touches[0].clientX);
+    if (day < 0) return;
+    chartTooltipDay = day;
+    renderChart();
+  }, { passive: true });
+  canvas.addEventListener('touchend', () => {
+    touchEndTimer = setTimeout(() => {
+      chartTooltipDay = -1;
+      renderChart();
+      touchEndTimer = null;
+    }, TOUCH_TOOLTIP_HIDE_MS);
+  });
 }
 
 // ──────────────────────────────────────────────
