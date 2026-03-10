@@ -1362,6 +1362,7 @@
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="meanreversion" onchange="onBotStrategyCheck(this)"> Mean Reversion</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="graduateddca" onchange="onBotStrategyCheck(this)"> Graduated DCA</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev5" onchange="onBotStrategyCheck(this)"> Claude.v5</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev6" onchange="onBotStrategyCheck(this)"> Claude.v6</label>
         </div>
         <div class="new-bot-row" id="newBotRow">
           <input type="text" id="newBotName" placeholder="New bot name…" />
@@ -1448,6 +1449,7 @@
               </tr>
             </thead>
             <tbody id="marketTableBody"></tbody>
+            <tfoot id="marketTableFoot"></tfoot>
           </table>
           </div>
         </div>
@@ -2544,6 +2546,31 @@ function updateMarketTable() {
     `;
     tbody.appendChild(row);
   });
+
+  // Summary row: average market gain/loss across all stocks
+  const tfoot = document.getElementById('marketTableFoot');
+  tfoot.innerHTML = '';
+  if (stocks.length > 0) {
+    let sumPct = 0, gainCount = 0, lossCount = 0;
+    stocks.forEach(s => {
+      const price = s.prices[currentDay];
+      const startPrice = (s.prices && s.prices.length > 0) ? s.prices[0] : price;
+      const pct = startPrice !== 0 ? (price - startPrice) / startPrice * 100 : 0;
+      sumPct += pct;
+      if (pct >= 0) gainCount++; else lossCount++;
+    });
+    const avgPct = sumPct / stocks.length;
+    const summaryColor = avgPct >= 0 ? '#22c55e' : '#ef4444';
+    const summaryRow = document.createElement('tr');
+    summaryRow.style.borderTop = '2px solid var(--border)';
+    summaryRow.style.fontWeight = '600';
+    summaryRow.innerHTML =
+      `<td>Market Summary</td>` +
+      `<td></td><td></td><td></td><td></td><td></td>` +
+      `<td style="color:${summaryColor}">${gainCount} ▲ / ${lossCount} ▼</td>` +
+      `<td style="color:${summaryColor}">Avg ${avgPct >= 0 ? '+' : ''}${avgPct.toFixed(2)}%</td>`;
+    tfoot.appendChild(summaryRow);
+  }
 }
 
 function updateBotPnlTable() {
@@ -3142,6 +3169,175 @@ if (inCrash && day > 22) {
     }
   }
 }`
+,
+
+claudev6:
+`// ═══════════════════════════════════════════════════════════════════
+// APEX v6 — Adaptive Market Regime Bot
+//
+// Two-simulation analysis:
+//   Bull market (sim 1): B&H +24%, Claude 4 +28% ✓ (stayed invested)
+//   Bear market (sim 2): B&H +5%,  Claude 5 -3%  ✗ (too defensive)
+//
+// Root cause of sim 2 loss:
+//   Crash detector fired → went to cash → market partially recovered
+//   → paid fees re-entering → missed recovery gains
+//
+// V6 solution: REGIME-ADAPTIVE behavior
+//   Bull regime  → mirror B&H (stay invested, almost never sell)
+//   Bear regime  → go defensive but RE-ENTER FAST on any recovery
+//   Uncertain    → stay invested but with tighter single-stock stops
+//
+// Key insight: in a $5-fee world, the ONLY winning move is to
+// minimise trades AND maximise time-in-market. Every regime
+// decision must clear a high bar before triggering a trade.
+// ═══════════════════════════════════════════════════════════════════
+
+const MAX_POS        = 8;
+const ALLOC_PCT      = 0.115;
+const STOP_PCT       = 0.18;      // very wide — only genuine disasters
+const MIN_POS        = 400;
+const DEPLOY_BY      = 5;         // fully invested by day 5
+
+// Regime thresholds — tuned to avoid whipsawing
+const BEAR_ENTER          = 0.30;   // <30% stocks above MA20 = confirmed bear
+const BULL_REENTER        = 0.55;   // >55% above MA20 = confirmed bull recovery
+const BEAR_CONFIRM        = 3;      // bear signal must persist N days before acting
+                                    // (we approximate with a stricter threshold)
+const BEAR_EXIT_THRESHOLD      = -0.07;   // exit losers in bear regime beyond this loss
+const UNCERTAIN_EXIT_THRESHOLD = -0.10;   // trim losers in uncertain regime beyond this loss
+const UNCERTAIN_MIN_DAY        = 30;      // only trim in uncertain regime after this day
+const BULL_MA_LOWER      = 0.99;   // buy above this fraction of MA20
+const BULL_MA_UPPER      = 1.07;   // buy below this fraction of MA20 (not overextended)
+
+// ── Portfolio state ───────────────────────────────────────────────
+
+const portValue = cash + Object.entries(holdings).reduce(
+  (s, [sym, h]) => s + (prices[sym] ?? 0) * h.shares, 0
+);
+const numPos = Object.keys(holdings).length;
+const syms = Object.keys(prices);
+
+// ── Compute market breadth ────────────────────────────────────────
+
+let aboveMA = 0, total = 0;
+for (const sym of syms) {
+  const h = priceHistory(sym, 22);
+  if (h.length < 20) continue;
+  const ma = h.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  total++;
+  if (prices[sym] > ma) aboveMA++;
+}
+const breadth = total > 0 ? aboveMA / total : 1.0;
+
+// ── Determine market regime ───────────────────────────────────────
+// Three regimes: BULL, BEAR, UNCERTAIN
+// Only switch regime if signal is STRONG to avoid whipsawing.
+// In early days (< 22) we default to BULL (deploy fast).
+
+let regime = "BULL";
+if (day > 22) {
+  if (breadth < BEAR_ENTER)        regime = "BEAR";
+  else if (breadth < BULL_REENTER) regime = "UNCERTAIN";
+  else                             regime = "BULL";
+}
+
+// ── Measure portfolio momentum (are our holdings working?) ────────
+// If our own holdings are underwater on average, be more cautious.
+let totalPnl = 0, heldCount = 0;
+for (const [sym, pos] of Object.entries(holdings)) {
+  const pct = (prices[sym] - pos.avgCost) / pos.avgCost;
+  totalPnl += pct;
+  heldCount++;
+}
+const avgHoldingPnl = heldCount > 0 ? totalPnl / heldCount : 0;
+
+// ── EXITS ─────────────────────────────────────────────────────────
+
+for (const [sym, pos] of Object.entries(holdings)) {
+  const price = prices[sym];
+  const { shares, avgCost } = pos;
+  const pnl = (price - avgCost) / avgCost;
+
+  // ① Hard stop: -18% — only truly broken stocks
+  if (pnl <= -STOP_PCT) {
+    sell(sym, shares);
+    continue;
+  }
+
+  // ② Bear regime exit: only sell if BOTH:
+  //    - confirmed bear (breadth < 30%) AND
+  //    - this specific position is losing AND
+  //    - we're past early deployment phase
+  // This stops us selling winners in a bear market!
+  if (regime === "BEAR" && day > DEPLOY_BY && pnl < BEAR_EXIT_THRESHOLD) {
+    sell(sym, shares);
+    continue;
+  }
+
+  // ③ Uncertain regime: trim clear losers (>10% down) but hold breakeven+
+  if (regime === "UNCERTAIN" && pnl < UNCERTAIN_EXIT_THRESHOLD && day > UNCERTAIN_MIN_DAY) {
+    sell(sym, shares);
+    continue;
+  }
+
+  // In BULL regime or profitable positions: DO NOTHING
+  // Sitting still is the highest-value action available.
+}
+
+// ── ENTRIES ───────────────────────────────────────────────────────
+
+// FAST DEPLOYMENT: days 1–DEPLOY_BY, always, regardless of regime
+// We cannot afford to miss the first week like earlier versions did.
+if (day <= DEPLOY_BY) {
+  const candidates = syms
+    .filter(s => !holdings[s])
+    .map(s => {
+      const h = priceHistory(s, Math.min(day, 4));
+      const m = h.length >= 2 ? (h[h.length-1] - h[0]) / Math.max(h[0], 0.01) : 0;
+      return { s, m };
+    })
+    .sort((a, b) => b.m - a.m);
+
+  for (const { s } of candidates) {
+    if (numPos >= MAX_POS) break;
+    const price = prices[s];
+    const alloc = Math.min(portValue * ALLOC_PCT, cash * 0.95);
+    if (alloc < MIN_POS) continue;
+    const shares = Math.floor(alloc / price);
+    if (shares > 0) buy(s, shares);
+  }
+}
+
+// BULL REGIME: fill any open slots, light MA filter
+else if (regime === "BULL" && numPos < MAX_POS && cash >= MIN_POS * 2) {
+  const eligible = syms
+    .filter(s => !holdings[s])
+    .map(s => {
+      const h = priceHistory(s, 22);
+      if (h.length < 20) return null;
+      const ma = h.slice(-20).reduce((a, b) => a + b, 0) / 20;
+      const p = prices[s];
+      // Buying above MA (uptrend) but not too extended
+      if (p > ma * BULL_MA_LOWER && p < ma * BULL_MA_UPPER) return { s, score: p / ma };
+      return null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score);
+
+  for (const { s } of eligible) {
+    if (numPos >= MAX_POS) break;
+    const p = prices[s];
+    const alloc = Math.min(portValue * ALLOC_PCT, cash * 0.95);
+    if (alloc < MIN_POS) continue;
+    const shares = Math.floor(alloc / p);
+    if (shares > 0) buy(s, shares);
+  }
+}
+
+// BEAR REGIME: no new buys. Cash is the position.
+// Exception: if we're nearly fully invested still (stops haven't fired),
+// that means bear signal is mild — don't force sells just to raise cash.`
 };
 
 const DEFAULT_BOT_SCRIPT = BOT_SCRIPTS.sma;
