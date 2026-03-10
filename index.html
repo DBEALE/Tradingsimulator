@@ -1003,6 +1003,15 @@
       flex-shrink: 0;
     }
 
+    .bot-color-dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      vertical-align: middle;
+    }
+
     .new-bot-row {
       display: flex;
       gap: 8px;
@@ -1642,6 +1651,7 @@ let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
 let botComparisonData = [];
+let botColorMap = {}; // maps bot key -> assigned color, persists within a simulation
 let visibleBotTradeMarkers = new Set();
 let showBotTradeMarkers = true;
 
@@ -1831,6 +1841,7 @@ function startSimulation() {
   isPlaying = false;
   isFinishing = false;
   botComparisonData = [];
+  botColorMap = {};
   visibleBotTradeMarkers = new Set();
   showBotTradeMarkers = true;
 
@@ -2004,8 +2015,13 @@ function getThemeColors() {
 }
 
 function getBotColor(botKey) {
-  const idx = botComparisonData.findIndex(b => b.key === botKey);
-  return BOT_COMPARISON_COLORS[(idx >= 0 ? idx : 0) % BOT_COMPARISON_COLORS.length];
+  if (!botColorMap[botKey]) {
+    const usedColors = new Set(Object.values(botColorMap));
+    const assignedColor = BOT_COMPARISON_COLORS.find(c => !usedColors.has(c))
+      || BOT_COMPARISON_COLORS[Object.keys(botColorMap).length % BOT_COMPARISON_COLORS.length];
+    botColorMap[botKey] = assignedColor;
+  }
+  return botColorMap[botKey];
 }
 
 function getVisibleComparisonTrades(symbol, seriesLen) {
@@ -2017,7 +2033,7 @@ function getVisibleComparisonTrades(symbol, seriesLen) {
     if (bot.key === activeKey || !visibleBotTradeMarkers.has(bot.key)) return;
     bot.transactions.forEach(tx => {
       if (tx.symbol === symbol && tx.day < seriesLen) {
-        trades.push({ ...tx, color: getBotColor(bot.key), botName: bot.name });
+        trades.push({ ...tx, color: bot.color, botName: bot.name });
       }
     });
   });
@@ -2347,7 +2363,7 @@ function renderBotPnlChart() {
   ctx.fillText(`$${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
 
   botComparisonData.forEach(bot => {
-    const color = getBotColor(bot.key);
+    const color = bot.color;
     ctx.beginPath();
     bot.pnlSeries.slice(0, currentDay + 1).forEach((v, i) => {
       i === 0 ? ctx.moveTo(xOf(i), yOf(v)) : ctx.lineTo(xOf(i), yOf(v));
@@ -2410,7 +2426,7 @@ function renderCompletionBotPnlChart() {
   ctx.fillText(`$${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
 
   botComparisonData.forEach(bot => {
-    const color = getBotColor(bot.key);
+    const color = bot.color;
     ctx.beginPath();
     bot.pnlSeries.slice(0, currentDay + 1).forEach((v, i) => {
       i === 0 ? ctx.moveTo(xOf(i), yOf(v)) : ctx.lineTo(xOf(i), yOf(v));
@@ -2594,7 +2610,7 @@ function updateBotPnlTable() {
     const retSign = returnPct >= 0 ? '+' : '-';
     const row = document.createElement('tr');
     row.innerHTML =
-      `<td style="font-weight:600">${escapeHtml(bot.name)}</td>` +
+      `<td style="font-weight:600"><span class="bot-color-dot" style="background:${bot.color};margin-right:6px"></span>${escapeHtml(bot.name)}</td>` +
       `<td>$${bot.cash.toFixed(2)}</td>` +
       `<td>$${bot.holdingsVal.toFixed(2)}</td>` +
       `<td>$${bot.total.toFixed(2)}</td>` +
@@ -2620,7 +2636,7 @@ function updateBlotter() {
   const allTrades = [];
   botComparisonData.forEach(bot => {
     bot.transactions.forEach(tx => {
-      allTrades.push({ ...tx, botName: bot.name });
+      allTrades.push({ ...tx, botName: bot.name, botColor: bot.color });
     });
   });
 
@@ -2641,7 +2657,7 @@ function updateBlotter() {
     const row = document.createElement('tr');
     row.innerHTML =
       `<td>${tx.day}</td>` +
-      `<td style="font-weight:600">${escapeHtml(tx.botName)}</td>` +
+      `<td style="font-weight:600"><span class="bot-color-dot" style="background:${tx.botColor};margin-right:6px"></span>${escapeHtml(tx.botName)}</td>` +
       `<td style="color:${color};font-weight:600">${tx.type.toUpperCase()}</td>` +
       `<td>${escapeHtml(tx.symbol)}</td>` +
       `<td>${tx.shares}</td>` +
@@ -3500,6 +3516,7 @@ function simulateBotStrategy(meta) {
   return {
     key: meta.key,
     name: meta.name,
+    color: getBotColor(meta.key),
     cash: simCash,
     holdings: simHoldings,
     transactions: simTransactions,
@@ -3516,6 +3533,28 @@ function refreshBotComparisonData() {
   botComparisonData = selected.map(meta => simulateBotStrategy(meta));
   // Always show all bot trade markers
   visibleBotTradeMarkers = new Set(botComparisonData.map(b => b.key));
+  updateBotStrategyColors();
+}
+
+function updateBotStrategyColors() {
+  document.querySelectorAll('#botStrategyList input[type=checkbox]').forEach(cb => {
+    const color = botColorMap[cb.value];
+    const lbl = cb.closest('label');
+    if (!lbl) return;
+    let dot = lbl.querySelector('.bot-color-dot');
+    if (!dot) {
+      dot = document.createElement('span');
+      dot.className = 'bot-color-dot';
+      dot.style.marginLeft = '6px';
+      lbl.appendChild(dot);
+    }
+    if (cb.checked && color) {
+      dot.style.background = color;
+      dot.style.visibility = 'visible';
+    } else {
+      dot.style.visibility = 'hidden';
+    }
+  });
 }
 
 function renderBotComparison() {
@@ -3536,7 +3575,7 @@ function renderBotComparison() {
     const retSign = returnPct >= 0 ? '+' : '-';
     const row = document.createElement('tr');
     row.innerHTML =
-      `<td style="font-weight:600">${escapeHtml(bot.name)}</td>` +
+      `<td style="font-weight:600"><span class="bot-color-dot" style="background:${bot.color};margin-right:6px"></span>${escapeHtml(bot.name)}</td>` +
       `<td>$${bot.cash.toFixed(2)}</td>` +
       `<td>$${bot.holdingsVal.toFixed(2)}</td>` +
       `<td>$${bot.total.toFixed(2)}</td>` +
