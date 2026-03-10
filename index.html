@@ -1442,6 +1442,8 @@
                 <th>Change %</th>
                 <th>Day High</th>
                 <th>Day Low</th>
+                <th>Total Gain</th>
+                <th>Total %</th>
               </tr>
             </thead>
             <tbody id="marketTableBody"></tbody>
@@ -2524,6 +2526,10 @@ function updateMarketTable() {
     const row = document.createElement('tr');
     const upDown = change >= 0 ? 'up' : 'down';
     const color  = change >= 0 ? '#22c55e' : '#ef4444';
+    const startPrice = (s.prices && s.prices.length > 0) ? s.prices[0] : price;
+    const totalChange = price - startPrice;
+    const totalChangePct = startPrice !== 0 ? (totalChange / startPrice) * 100 : 0;
+    const totalColor = totalChange >= 0 ? '#22c55e' : '#ef4444';
     row.innerHTML = `
       <td style="font-weight:600; cursor:pointer; color:${s.color}" onclick="setActiveStock('${s.symbol}')">${s.symbol}</td>
       <td>$${price.toFixed(2)}</td>
@@ -2531,6 +2537,8 @@ function updateMarketTable() {
       <td style="color:${color}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
       <td>$${high.toFixed(2)}</td>
       <td>$${low.toFixed(2)}</td>
+      <td style="color:${totalColor}">${totalChange >= 0 ? '+' : ''}${totalChange.toFixed(2)}</td>
+      <td style="color:${totalColor}">${totalChangePct >= 0 ? '+' : ''}${totalChangePct.toFixed(2)}%</td>
     `;
     tbody.appendChild(row);
   });
