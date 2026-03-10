@@ -1735,7 +1735,11 @@ const CHART_COLORS = [
   '#fdba74', '#2dd4bf', '#e879f9', '#d9f99d',
   '#93c5fd', '#6ee7b7', '#fde68a', '#fca5a5',
 ];
-const BOT_COMPARISON_COLORS = ['#22c55e', '#f59e0b', '#38bdf8', '#ef4444', '#a855f7', '#14b8a6'];
+const BOT_COMPARISON_COLORS = [
+  '#22c55e', '#f59e0b', '#38bdf8', '#ef4444', '#a855f7', '#14b8a6',
+  '#f97316', '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#e11d48',
+  '#0ea5e9', '#d97706', '#10b981', '#8b5cf6',
+];
 
 // ──────────────────────────────────────────────
 // Simulation helpers
@@ -2563,28 +2567,34 @@ function updateMarketTable() {
     tbody.appendChild(row);
   });
 
-  // Summary row: average market gain/loss across all stocks
+  // Summary row: summarised day high/low, total gain, total %
   const tfoot = document.getElementById('marketTableFoot');
   tfoot.innerHTML = '';
   if (stocks.length > 0) {
-    let sumPct = 0, gainCount = 0, lossCount = 0;
+    let sumHigh = 0, sumLow = 0, sumTotalChange = 0, sumStartPrice = 0;
     stocks.forEach(s => {
       const price = s.prices[currentDay];
+      const prev = s.prices[Math.max(0, currentDay - 1)];
+      sumHigh += Math.max(prev, price);
+      sumLow  += Math.min(prev, price);
       const startPrice = (s.prices && s.prices.length > 0) ? s.prices[0] : price;
-      const pct = startPrice !== 0 ? (price - startPrice) / startPrice * 100 : 0;
-      sumPct += pct;
-      if (pct >= 0) gainCount++; else lossCount++;
+      sumTotalChange += (price - startPrice);
+      sumStartPrice  += startPrice;
     });
-    const avgPct = sumPct / stocks.length;
-    const summaryColor = avgPct >= 0 ? '#22c55e' : '#ef4444';
+    const avgHigh = sumHigh / stocks.length;
+    const avgLow  = sumLow  / stocks.length;
+    const totalPct = sumStartPrice !== 0 ? (sumTotalChange / sumStartPrice) * 100 : 0;
+    const summaryColor = sumTotalChange >= 0 ? '#22c55e' : '#ef4444';
     const summaryRow = document.createElement('tr');
     summaryRow.style.borderTop = '2px solid var(--border)';
     summaryRow.style.fontWeight = '600';
     summaryRow.innerHTML =
       `<td>Market Summary</td>` +
-      `<td></td><td></td><td></td><td></td><td></td>` +
-      `<td style="color:${summaryColor}">${gainCount} ▲ / ${lossCount} ▼</td>` +
-      `<td style="color:${summaryColor}">Avg ${avgPct >= 0 ? '+' : ''}${avgPct.toFixed(2)}%</td>`;
+      `<td></td><td></td><td></td>` +
+      `<td>$${avgHigh.toFixed(2)}</td>` +
+      `<td>$${avgLow.toFixed(2)}</td>` +
+      `<td style="color:${summaryColor}">${sumTotalChange >= 0 ? '+' : ''}$${Math.abs(sumTotalChange).toFixed(2)}</td>` +
+      `<td style="color:${summaryColor}">${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(2)}%</td>`;
     tfoot.appendChild(summaryRow);
   }
 }
@@ -2652,13 +2662,11 @@ function updateBlotter() {
   card.classList.remove('hidden');
   tbody.innerHTML = '';
   allTrades.forEach(tx => {
-    const isBuy = tx.type === 'buy';
-    const color = isBuy ? '#22c55e' : '#ef4444';
     const row = document.createElement('tr');
     row.innerHTML =
       `<td>${tx.day}</td>` +
       `<td style="font-weight:600"><span class="bot-color-dot" style="background:${tx.botColor};margin-right:6px"></span>${escapeHtml(tx.botName)}</td>` +
-      `<td style="color:${color};font-weight:600">${tx.type.toUpperCase()}</td>` +
+      `<td style="color:${tx.botColor};font-weight:600">${tx.type.toUpperCase()}</td>` +
       `<td>${escapeHtml(tx.symbol)}</td>` +
       `<td>${tx.shares}</td>` +
       `<td>$${tx.price.toFixed(2)}</td>` +
