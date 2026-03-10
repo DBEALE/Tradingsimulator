@@ -1464,6 +1464,7 @@
                 <th>Total</th>
                 <th>P&amp;L ↓</th>
                 <th>Return</th>
+                <th>Costs</th>
                 <th>Trades</th>
               </tr>
             </thead>
@@ -1596,7 +1597,7 @@
           <table>
             <thead>
               <tr>
-                <th>Bot</th><th>Cash</th><th>Holdings</th><th>Total</th><th>P&amp;L ↓</th><th>Return</th><th>Trades</th>
+                <th>Bot</th><th>Cash</th><th>Holdings</th><th>Total</th><th>P&amp;L ↓</th><th>Return</th><th>Costs</th><th>Trades</th>
               </tr>
             </thead>
             <tbody id="cmBotPnlTableBody"></tbody>
@@ -2571,6 +2572,7 @@ function updateBotPnlTable() {
       `<td>$${bot.total.toFixed(2)}</td>` +
       `<td style="color:${pnlColor}">${pnlSign}$${Math.abs(bot.pnl).toFixed(2)}</td>` +
       `<td style="color:${pnlColor}">${retSign}${Math.abs(returnPct).toFixed(2)}%</td>` +
+      `<td>$${(bot.tradingCosts || 0).toFixed(2)}</td>` +
       `<td>${bot.transactions.length}</td>`;
     tbody.appendChild(row);
   });
@@ -3034,6 +3036,7 @@ function simulateBotStrategy(meta) {
   const simHoldings = {};
   const simTransactions = [];
   let simCash = startingCapital;
+  let simTradingCosts = 0;
   const pnlSeries = [0];
 
   for (let day = 1; day <= currentDay; day++) {
@@ -3066,6 +3069,7 @@ function simulateBotStrategy(meta) {
       const cost = shares * price + tradingCost;
       if (cost > simCash) return;
       simCash -= cost;
+      simTradingCosts += tradingCost;
       if (!simHoldings[symbol]) simHoldings[symbol] = { shares: 0, totalCost: 0 };
       simHoldings[symbol].shares += shares;
       simHoldings[symbol].totalCost += cost;
@@ -3083,6 +3087,7 @@ function simulateBotStrategy(meta) {
       const prevShares = simHoldings[symbol].shares;
       if (prevShares <= 0) return;
       simCash += proceeds;
+      simTradingCosts += tradingCost;
       simHoldings[symbol].shares -= shares;
       const ratio = shares / prevShares;
       simHoldings[symbol].totalCost *= (1 - ratio);
@@ -3115,7 +3120,8 @@ function simulateBotStrategy(meta) {
     pnlSeries,
     holdingsVal,
     total,
-    pnl: total - startingCapital
+    pnl: total - startingCapital,
+    tradingCosts: simTradingCosts
   };
 }
 
@@ -3150,6 +3156,7 @@ function renderBotComparison() {
       `<td>$${bot.total.toFixed(2)}</td>` +
       `<td style="color:${pnlColor}">${pnlSign}$${Math.abs(bot.pnl).toFixed(2)}</td>` +
       `<td style="color:${pnlColor}">${retSign}${Math.abs(returnPct).toFixed(2)}%</td>` +
+      `<td>$${(bot.tradingCosts || 0).toFixed(2)}</td>` +
       `<td>${bot.transactions.length}</td>`;
     tbody.appendChild(row);
   });
