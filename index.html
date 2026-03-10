@@ -1361,6 +1361,7 @@
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="buyhold" onchange="onBotStrategyCheck(this)"> Buy &amp; Hold</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="meanreversion" onchange="onBotStrategyCheck(this)"> Mean Reversion</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="graduateddca" onchange="onBotStrategyCheck(this)"> Graduated DCA</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev5" onchange="onBotStrategyCheck(this)"> Claude.v5</label>
         </div>
         <div class="new-bot-row" id="newBotRow">
           <input type="text" id="newBotName" placeholder="New bot name…" />
@@ -2949,6 +2950,195 @@ if (day === 1) {
       // Rise 25–35% → Sell 10%
       const shares = Math.floor(owned * 0.10);
       if (shares > 0) sell(symbol, shares);
+    }
+  }
+}`,
+
+claudev5:
+`// ═══════════════════════════════════════════════════════════════════
+// APEX v5 — Refined from v4's winning formula
+//
+// What v4 got RIGHT (keep these):
+//   ✓ Deploy within 12 days — being invested beats sitting in cash
+//   ✓ Wide 15% stop — survived noise, only exited real breakdowns
+//   ✓ 8 diversified positions — matched B&H breadth
+//   ✓ Breadth crash detector — only smart exit signal available
+//
+// What v5 improves:
+//   + Deploy even faster (day 1–6) to close gap with B&H day-1 entry
+//   + After deployment, tilt toward top performers via partial rotation
+//   + Tighten crash detector (35% threshold vs 40%)
+//   + Re-enter faster after crash clears (don't sit in cash too long)
+//   + Raise stop to 17% — v4's 15% may have stopped out recoveries
+// ═══════════════════════════════════════════════════════════════════
+
+const MAX_POSITIONS   = 8;
+const ALLOC_PCT       = 0.115;   // ~11.5% each → ~92% deployed
+const DISASTER_STOP   = 0.17;    // 17% — only genuine breakdowns
+const MIN_POSITION    = 400;
+const DEPLOY_BY_DAY   = 6;       // deploy full basket by day 6 (faster than v4's 12)
+const CRASH_THRESHOLD = 0.35;    // <35% stocks above MA20 = market crash
+const REENTER_THRESH  = 0.50;    // re-enter when 50% stocks back above MA20
+const ROTATION_START  = 60;      // only rotate positions after day 60 (let things settle)
+const ROTATION_GAP    = 0.12;    // only rotate if winner outperforms loser by 12%+
+
+// ── Portfolio state ───────────────────────────────────────────────
+
+const portValue = cash + Object.entries(holdings).reduce(
+  (s, [sym, h]) => s + (prices[sym] ?? 0) * h.shares, 0
+);
+const numPos = Object.keys(holdings).length;
+const symbols = Object.keys(prices);
+
+// ── Market breadth ────────────────────────────────────────────────
+
+let bullish = 0, checked = 0;
+if (day > 22) {
+  for (const sym of symbols) {
+    const h = priceHistory(sym, 21);
+    if (h.length < 20) continue;
+    const ma20 = h.slice(-20).reduce((a, b) => a + b, 0) / 20;
+    checked++;
+    if (prices[sym] > ma20) bullish++;
+  }
+}
+const breadthRatio = checked > 0 ? bullish / checked : 1.0;
+const inCrash    = breadthRatio < CRASH_THRESHOLD;
+const recovering = breadthRatio >= REENTER_THRESH;
+
+// ── EXITS ─────────────────────────────────────────────────────────
+
+for (const [sym, pos] of Object.entries(holdings)) {
+  const price = prices[sym];
+  const { shares, avgCost } = pos;
+  const pnlPct = (price - avgCost) / avgCost;
+
+  // ① Hard disaster stop — always fires
+  if (pnlPct <= -DISASTER_STOP) {
+    sell(sym, shares);
+    continue;
+  }
+
+  // ② Crash exit: market breadth collapsed AND position losing
+  // Don't sell winners just because market is rough
+  if (inCrash && pnlPct < -0.06) {
+    sell(sym, shares);
+    continue;
+  }
+
+  // ③ Selective rotation: only after day 60, only meaningful gaps
+  // Swap a clear laggard for a clear leader — not just noise
+  if (day >= ROTATION_START && !inCrash) {
+    // Score this position's recent momentum (20-day)
+    const h = priceHistory(sym, 22);
+    if (h.length >= 21) {
+      const posReturn = (price - h[h.length - 21]) / h[h.length - 21];
+
+      // Find best non-held stock's recent return
+      let bestReturn = -Infinity;
+      for (const s of symbols) {
+        if (holdings[s]) continue;
+        const sh = priceHistory(s, 22);
+        if (sh.length < 21) continue;
+        const r = (prices[s] - sh[sh.length - 21]) / sh[sh.length - 21];
+        if (r > bestReturn) bestReturn = r;
+      }
+
+      // Only rotate if the best available stock is clearly outperforming
+      // by ROTATION_GAP AND this position is actually negative
+      if (bestReturn - posReturn > ROTATION_GAP && pnlPct < 0) {
+        sell(sym, shares);
+        continue;
+      }
+    }
+  }
+}
+
+// ── ENTRIES ───────────────────────────────────────────────────────
+
+// Don't buy during confirmed crash (wait for recovery signal)
+if (inCrash && day > 22) {
+  // Sit tight — cash is the position
+} else {
+
+  // FAST DEPLOYMENT: days 1–DEPLOY_BY_DAY
+  // Get fully invested immediately, mild momentum tilt
+  if (day <= DEPLOY_BY_DAY && numPos < MAX_POSITIONS) {
+    const candidates = symbols
+      .filter(sym => !holdings[sym])
+      .map(sym => {
+        const h = priceHistory(sym, Math.min(day, 4));
+        const earlyMom = h.length >= 2
+          ? (h[h.length - 1] - h[0]) / Math.max(h[0], 0.01)
+          : 0;
+        return { sym, earlyMom };
+      })
+      .sort((a, b) => b.earlyMom - a.earlyMom);
+
+    for (const { sym } of candidates) {
+      if (numPos >= MAX_POSITIONS) break;
+      const price = prices[sym];
+      const alloc = Math.min(portValue * ALLOC_PCT, cash * 0.95);
+      if (alloc < MIN_POSITION) continue;
+      const shares = Math.floor(alloc / price);
+      if (shares > 0) buy(sym, shares);
+    }
+  }
+
+  // POST-CRASH RE-ENTRY: buy back in once breadth recovers
+  else if (numPos < MAX_POSITIONS && breadthRatio >= REENTER_THRESH) {
+    // Re-enter with simple above-MA20 filter
+    const eligible = symbols
+      .filter(sym => !holdings[sym])
+      .map(sym => {
+        const h = priceHistory(sym, 22);
+        if (h.length < 20) return null;
+        const ma20 = h.slice(-20).reduce((a, b) => a + b, 0) / 20;
+        const price = prices[sym];
+        if (price > ma20 * 0.98) { // at or above MA20
+          const score = (price - ma20) / ma20;
+          return { sym, score };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score);
+
+    for (const { sym } of eligible) {
+      if (numPos >= MAX_POSITIONS) break;
+      const price = prices[sym];
+      const alloc = Math.min(portValue * ALLOC_PCT, cash * 0.95);
+      if (alloc < MIN_POSITION) continue;
+      const shares = Math.floor(alloc / price);
+      if (shares > 0) buy(sym, shares);
+    }
+  }
+
+  // ROTATION FILL: if a slot opened mid-run (stop-out), fill it
+  else if (numPos < MAX_POSITIONS && day > DEPLOY_BY_DAY && cash >= MIN_POSITION * 2) {
+    const eligible = symbols
+      .filter(sym => !holdings[sym])
+      .map(sym => {
+        const h = priceHistory(sym, 22);
+        if (h.length < 20) return null;
+        const ma20 = h.slice(-20).reduce((a, b) => a + b, 0) / 20;
+        const price = prices[sym];
+        if (price > ma20 && price < ma20 * 1.06) {
+          return { sym, score: (price / ma20) };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score);
+
+    if (eligible.length > 0) {
+      const { sym } = eligible[0];
+      const price = prices[sym];
+      const alloc = Math.min(portValue * ALLOC_PCT, cash * 0.95);
+      if (alloc >= MIN_POSITION) {
+        const shares = Math.floor(alloc / price);
+        if (shares > 0) buy(sym, shares);
+      }
     }
   }
 }`
