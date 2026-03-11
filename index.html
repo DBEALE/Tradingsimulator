@@ -253,7 +253,10 @@
     }
 
     .tab-btn {
-      padding: 6px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 5px 10px;
       border-radius: 6px;
       font-size: 0.85rem;
       font-weight: 600;
@@ -275,14 +278,28 @@
       color: var(--text);
     }
 
+    .tab-label {
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+
     .tab-dot {
       display: inline-block;
       width: 8px;
       height: 8px;
       border-radius: 50%;
       margin-right: 5px;
-      vertical-align: middle;
       flex-shrink: 0;
+    }
+
+    .tab-thumbnail {
+      width: 56px;
+      height: 18px;
+      margin-top: 4px;
+      border-radius: 3px;
+      background: rgba(0, 0, 0, 0.15);
+      display: block;
     }
 
     /* ── Price display ── */
@@ -630,7 +647,8 @@
         scrollbar-width: none;
       }
       .stock-tabs::-webkit-scrollbar { display: none; }
-      .tab-btn { flex-shrink: 0; padding: 5px 10px; font-size: 0.8rem; }
+      .tab-btn { flex-shrink: 0; padding: 4px 8px; font-size: 0.8rem; }
+      .tab-thumbnail { width: 48px; height: 16px; }
 
       /* Sim controls: 2-column grid so buttons don't crowd or overflow */
       .sim-controls {
@@ -1659,6 +1677,9 @@ const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
 const FINISH_CHUNK_SIZE = 50;
 const STOCK_SEARCH_THRESHOLD = 10; // show mobile search filter when stock count exceeds this
 const TOUCH_TOOLTIP_HIDE_MS = 2500; // ms before the touch tooltip auto-hides after touchend
+const THUMBNAIL_UPDATE_INTERVAL = 5; // redraw sparkline thumbnails every N simulation days
+const THUMBNAIL_W = 56; // sparkline canvas CSS width (matches .tab-thumbnail width)
+const THUMBNAIL_H = 18; // sparkline canvas CSS height (matches .tab-thumbnail height)
 
 const STOCK_TEMPLATES = [
   { name: 'AlphaTech',   symbol: 'ATEC', basePrice: 150, volatility: 0.018, drift: 0.0003 },
@@ -1856,6 +1877,7 @@ function startSimulation() {
 
   buildStockTabs();
   setActiveStock(stocks[0].symbol);
+  updateStockThumbnails();
   attachChartHover();
   updateMarketTable();
   refreshBotComparisonData();
@@ -1906,7 +1928,9 @@ function buildStockTabs() {
     const btn = document.createElement('button');
     btn.className = 'tab-btn';
     btn.dataset.symbol = s.symbol;
-    btn.innerHTML = '<span class="tab-dot" style="background:' + s.color + '"></span>' + s.symbol;
+    btn.innerHTML =
+      '<span class="tab-label"><span class="tab-dot" style="background:' + s.color + '"></span>' + s.symbol + '</span>' +
+      '<canvas class="tab-thumbnail"></canvas>';
     btn.onclick = () => toggleStockVisibility(s.symbol);
     tabs.appendChild(btn);
   });
@@ -1998,6 +2022,54 @@ function filterStockTabs(query) {
     const match = !q || symbol.includes(q) || name.includes(q);
     btn.style.display = match ? '' : 'none';
   });
+}
+
+/**
+ * Draws a sparkline price thumbnail on the canvas inside a stock's tab button.
+ * Uses green when the current price is at or above the start price, red otherwise.
+ */
+function renderStockThumbnail(stock) {
+  const btn = document.querySelector(`#stockTabs .tab-btn[data-symbol="${stock.symbol}"]`);
+  if (!btn) return;
+  const canvas = btn.querySelector('.tab-thumbnail');
+  if (!canvas) return;
+
+  const prices = stock.prices.slice(0, currentDay + 1);
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || THUMBNAIL_W;
+  const H = canvas.offsetHeight || THUMBNAIL_H;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  if (prices.length < 2) return;
+
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const range = maxP - minP || 1;
+  const PAD = 1; // 1px inset so the stroke isn't clipped at canvas edges
+  const xOf = i => PAD + (i / (prices.length - 1)) * (W - PAD * 2);
+  const yOf = v => H - PAD - ((v - minP) / range) * (H - PAD * 2);
+
+  const lineColor = prices[prices.length - 1] >= prices[0] ? '#22c55e' : '#ef4444';
+
+  ctx.beginPath();
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  prices.forEach((p, i) => {
+    i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p));
+  });
+  ctx.stroke();
+}
+
+/**
+ * Redraws sparkline thumbnails for all stocks.
+ */
+function updateStockThumbnails() {
+  stocks.forEach(s => renderStockThumbnail(s));
 }
 
 // ──────────────────────────────────────────────
@@ -2758,6 +2830,9 @@ function updateDay() {
   updateMarketTable();
   updateBotPnlTable();
   updateBlotter();
+  if (currentDay <= 1 || currentDay % THUMBNAIL_UPDATE_INTERVAL === 0 || currentDay >= totalDays) {
+    updateStockThumbnails();
+  }
 }
 
 function updateSpeed(val) {
