@@ -680,16 +680,16 @@
       .step-card { padding: 16px 14px; }
 
       /* Market Overview: hide Day High / Day Low on mobile */
-      #marketTable th:nth-child(5),
-      #marketTable td:nth-child(5),
       #marketTable th:nth-child(6),
-      #marketTable td:nth-child(6) { display: none; }
+      #marketTable td:nth-child(6),
+      #marketTable th:nth-child(7),
+      #marketTable td:nth-child(7) { display: none; }
 
       /* Bot P&L table: hide Cash and Holdings columns to save space */
-      #botPnlTable th:nth-child(2),
-      #botPnlTable td:nth-child(2),
       #botPnlTable th:nth-child(3),
-      #botPnlTable td:nth-child(3) { display: none; }
+      #botPnlTable td:nth-child(3),
+      #botPnlTable th:nth-child(4),
+      #botPnlTable td:nth-child(4) { display: none; }
 
       /* Blotter: hide Price column to save space */
       #blotterTable th:nth-child(6),
@@ -719,8 +719,8 @@
       .sim-controls .btn { font-size: 0.78rem; padding: 9px 6px; }
 
       /* Market Overview: also hide Change column at very small widths */
-      #marketTable th:nth-child(3),
-      #marketTable td:nth-child(3) { display: none; }
+      #marketTable th:nth-child(4),
+      #marketTable td:nth-child(4) { display: none; }
     }
 
     /* ── Horizontal-scroll wrapper for wide tables on mobile ── */
