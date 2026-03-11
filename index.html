@@ -643,20 +643,20 @@
       .pnl-chart-wrapper { height: 130px; }
       .price-value { font-size: 1.5rem; }
 
-      /* Stock tabs: horizontal scroll so many tabs don't stack vertically */
+      /* Stock tabs: vertical scroll so many tabs don't expand the page width */
       .stock-tabs {
-        display: flex;
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        overflow-y: hidden;
-        max-height: none;
+        flex-wrap: wrap;
+        overflow-y: auto;
+        overflow-x: hidden;
+        max-height: 180px;
         -webkit-overflow-scrolling: touch;
-        padding-bottom: 4px;
-        scrollbar-width: none;
+        scrollbar-width: thin;
       }
-      .stock-tabs::-webkit-scrollbar { display: none; }
+      .stock-tabs::-webkit-scrollbar { width: 3px; }
+      .stock-tabs::-webkit-scrollbar-track { background: transparent; }
+      .stock-tabs::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
       .tab-btn { flex-shrink: 0; padding: 4px 8px; font-size: 0.8rem; }
-      .tab-thumbnail { width: 48px; height: 16px; }
+      .tab-thumbnail { width: 40px; height: 14px; }
 
       /* Sim controls: 2-column grid so buttons don't crowd or overflow */
       .sim-controls {
