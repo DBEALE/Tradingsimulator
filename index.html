@@ -1637,7 +1637,7 @@
           <table>
             <thead>
               <tr>
-                <th>Bot</th><th>Cash</th><th>Holdings</th><th>Total</th><th>P&amp;L ↓</th><th>Return</th><th>Costs</th><th>Trades</th>
+                <th>Bot</th><th>Chart</th><th>Cash</th><th>Holdings</th><th>Total</th><th>P&amp;L ↓</th><th>Return</th><th>Costs</th><th>Trades</th>
               </tr>
             </thead>
             <tbody id="cmBotPnlTableBody"></tbody>
@@ -3713,6 +3713,7 @@ function renderBotComparison() {
     const row = document.createElement('tr');
     row.innerHTML =
       `<td style="font-weight:600"><span class="bot-color-dot" style="background:${bot.color};margin-right:6px"></span>${escapeHtml(bot.name)}</td>` +
+      `<td><canvas class="table-thumbnail cm-bot-thumbnail"></canvas></td>` +
       `<td>$${bot.cash.toFixed(2)}</td>` +
       `<td>$${bot.holdingsVal.toFixed(2)}</td>` +
       `<td>$${bot.total.toFixed(2)}</td>` +
@@ -3721,6 +3722,10 @@ function renderBotComparison() {
       `<td>$${(bot.tradingCosts || 0).toFixed(2)}</td>` +
       `<td>${bot.transactions.length}</td>`;
     tbody.appendChild(row);
+    const thumbCanvas = row.querySelector('.cm-bot-thumbnail');
+    if (thumbCanvas && bot.pnlSeries && bot.pnlSeries.length >= 2) {
+      drawTableSparkline(thumbCanvas, bot.pnlSeries, pnlColor);
+    }
   });
 }
 
