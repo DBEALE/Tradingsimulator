@@ -713,6 +713,7 @@
       header h1 { font-size: 1rem; }
       header span.badge { display: none; }
       .portfolio-summary { grid-template-columns: 1fr; }
+      .market-stat-bar { grid-template-columns: 1fr; }
       .stat-box .value { font-size: 1rem; }
       .price-value { font-size: 1.3rem; }
       .card { padding: 10px; }
@@ -967,6 +968,18 @@
     .stat-box.pnl-box .value {
       font-size: 1.8rem;
     }
+
+    /* ── Market Overview stat bar ── */
+    .market-stat-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .market-stat-bar .stat-box .label { font-size: 0.7rem; }
+    .market-stat-bar .stat-box .value { font-size: 0.95rem; }
+    .market-stat-bar .stat-box .sub   { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
 
     /* ── Scrollable stock tabs for many stocks ── */
     .stock-tabs {
@@ -1461,7 +1474,7 @@
 
           <div class="speed-row">
             <span>Speed:</span>
-            <input type="range" id="speedSlider" min="1" max="10" value="5" oninput="updateSpeed(this.value)" />
+            <input type="range" id="speedSlider" min="1" max="20" value="5" oninput="updateSpeed(this.value)" />
             <span id="speedLabel">5×</span>
           </div>
         </div>
@@ -1469,6 +1482,23 @@
         <!-- Market Overview mini table -->
         <div class="card">
           <h3>Market Overview</h3>
+          <div class="market-stat-bar" id="marketStatBar">
+            <div class="stat-box">
+              <div class="label">Market Value</div>
+              <div class="value" id="msvMarketValue">—</div>
+              <div class="sub" id="msvMarketValueSub">&nbsp;</div>
+            </div>
+            <div class="stat-box">
+              <div class="label">Daily Movement</div>
+              <div class="value" id="msvDailyMove">—</div>
+              <div class="sub" id="msvDailyMoveSub">&nbsp;</div>
+            </div>
+            <div class="stat-box">
+              <div class="label">Overall Movement</div>
+              <div class="value" id="msvOverallMove">—</div>
+              <div class="sub" id="msvOverallMoveSub">&nbsp;</div>
+            </div>
+          </div>
           <div class="table-scroll" id="marketTableWrap">
           <table class="holdings-table" id="marketTable">
             <thead>
@@ -1678,6 +1708,7 @@ let isFinishing = false;
 let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
+let ticksPerStep = 1; // days advanced per timer tick (>1 for batch mode at high speeds)
 let botComparisonData = [];
 let botColorMap = {}; // maps bot key -> assigned color, persists within a simulation
 let visibleBotTradeMarkers = new Set();
@@ -1903,6 +1934,12 @@ function startSimulation() {
   botEnabled = true;
 
   // Keep bot controls editable on day 0; lock once simulation advances.
+
+  // Sync speedMs / ticksPerStep with whatever the slider currently shows, so that
+  // pressing Play immediately uses the right interval without requiring the user to
+  // move the slider again after each reset.
+  const sliderVal = parseInt(document.getElementById('speedSlider').value, 10);
+  updateSpeed(sliderVal);
 }
 
 function resetSimulation() {
@@ -2654,22 +2691,34 @@ function updatePriceHeader() {
 function updateMarketTable() {
   const tbody = document.getElementById('marketTableBody');
   tbody.innerHTML = '';
+
+  // Accumulators for the stat bar and summary row
+  let sumCurrentPrices = 0, sumOpenPrices = 0, sumStartPrices = 0;
+  let sumDailyChange = 0, sumTotalChange = 0;
+  let sumHigh = 0, sumLow = 0;
+
   stocks.forEach(s => {
     const price = s.prices[currentDay];
     const prev = s.prices[Math.max(0, currentDay - 1)];
     const change = price - prev;
     const changePct = prev !== 0 ? (change / prev) * 100 : 0;
-    // Day high/low (last 1 day only — just current day's high/low from open)
-    const open = s.prices[Math.max(0, currentDay - 1)];
+    const open = prev;
     const high = Math.max(open, price);
     const low  = Math.min(open, price);
-
-    const row = document.createElement('tr');
-    const upDown = change >= 0 ? 'up' : 'down';
-    const color  = change >= 0 ? '#22c55e' : '#ef4444';
     const startPrice = (s.prices && s.prices.length > 0) ? s.prices[0] : price;
     const totalChange = price - startPrice;
     const totalChangePct = startPrice !== 0 ? (totalChange / startPrice) * 100 : 0;
+
+    sumCurrentPrices += price;
+    sumOpenPrices    += prev;
+    sumStartPrices   += startPrice;
+    sumDailyChange   += change;
+    sumTotalChange   += totalChange;
+    sumHigh          += high;
+    sumLow           += low;
+
+    const row = document.createElement('tr');
+    const color      = change >= 0 ? '#22c55e' : '#ef4444';
     const totalColor = totalChange >= 0 ? '#22c55e' : '#ef4444';
     row.innerHTML = `
       <td style="font-weight:600; cursor:pointer; color:${s.color}" onclick="setActiveStock('${s.symbol}')">${s.symbol}</td>
@@ -2689,26 +2738,38 @@ function updateMarketTable() {
     drawTableSparkline(sparklineCanvas, sparklinePrices, sparklineColor);
   });
 
-  // Summary row: summarised day high/low, total gain, total %
+  // ── Market stat bar ──────────────────────────────────────────────────────────
+  if (stocks.length > 0) {
+    const dailyChangePct  = sumOpenPrices  !== 0 ? (sumDailyChange  / sumOpenPrices)  * 100 : 0;
+    const overallPct      = sumStartPrices !== 0 ? (sumTotalChange  / sumStartPrices) * 100 : 0;
+    const dailyColor      = sumDailyChange  >= 0 ? '#22c55e' : '#ef4444';
+    const overallColor    = sumTotalChange  >= 0 ? '#22c55e' : '#ef4444';
+    const formatSign = v => v >= 0 ? '+' : '-';
+
+    document.getElementById('msvMarketValue').textContent    = `$${sumCurrentPrices.toFixed(2)}`;
+    document.getElementById('msvMarketValueSub').textContent = `${stocks.length} stock${stocks.length !== 1 ? 's' : ''}`;
+
+    const mvEl = document.getElementById('msvDailyMove');
+    mvEl.textContent  = `${formatSign(sumDailyChange)}$${Math.abs(sumDailyChange).toFixed(2)}`;
+    mvEl.style.color  = dailyColor;
+    document.getElementById('msvDailyMoveSub').textContent   = `${formatSign(dailyChangePct)}${Math.abs(dailyChangePct).toFixed(2)}% today`;
+
+    const ovEl = document.getElementById('msvOverallMove');
+    ovEl.textContent  = `${formatSign(sumTotalChange)}$${Math.abs(sumTotalChange).toFixed(2)}`;
+    ovEl.style.color  = overallColor;
+    document.getElementById('msvOverallMoveSub').textContent = `${formatSign(overallPct)}${Math.abs(overallPct).toFixed(2)}% from start`;
+  }
+
+  // ── Summary footer row ───────────────────────────────────────────────────────
   const tfoot = document.getElementById('marketTableFoot');
   tfoot.innerHTML = '';
   if (stocks.length > 0) {
-    let sumHigh = 0, sumLow = 0, sumTotalChange = 0, sumStartPrice = 0;
-    stocks.forEach(s => {
-      const price = s.prices[currentDay];
-      const prev = s.prices[Math.max(0, currentDay - 1)];
-      sumHigh += Math.max(prev, price);
-      sumLow  += Math.min(prev, price);
-      const startPrice = (s.prices && s.prices.length > 0) ? s.prices[0] : price;
-      sumTotalChange += (price - startPrice);
-      sumStartPrice  += startPrice;
-    });
-    const avgHigh = sumHigh / stocks.length;
-    const avgLow  = sumLow  / stocks.length;
-    const totalPct = sumStartPrice !== 0 ? (sumTotalChange / sumStartPrice) * 100 : 0;
+    const avgHigh      = sumHigh / stocks.length;
+    const avgLow       = sumLow  / stocks.length;
+    const totalPct     = sumStartPrices !== 0 ? (sumTotalChange / sumStartPrices) * 100 : 0;
     const summaryColor = sumTotalChange >= 0 ? '#22c55e' : '#ef4444';
-    const summaryRow = document.createElement('tr');
-    summaryRow.style.borderTop = '2px solid var(--border)';
+    const summaryRow   = document.createElement('tr');
+    summaryRow.style.borderTop  = '2px solid var(--border)';
     summaryRow.style.fontWeight = '600';
     summaryRow.innerHTML =
       `<td>Market Summary</td>` +
@@ -2827,10 +2888,19 @@ function tick() {
     showCompletionModal();
     return;
   }
-  currentDay++;
+  for (let i = 0; i < ticksPerStep; i++) {
+    if (currentDay >= totalDays) break;
+    currentDay++;
+    if (botEnabled) runTradingScript();
+  }
   lockBotUI();
   updateDay();
-  if (botEnabled) runTradingScript();
+  if (currentDay >= totalDays) {
+    clearInterval(playInterval);
+    isPlaying = false;
+    document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
+    showCompletionModal();
+  }
 }
 
 function stepForward() {
@@ -2891,7 +2961,17 @@ function updateDay() {
 
 function updateSpeed(val) {
   document.getElementById('speedLabel').textContent = `${val}×`;
-  speedMs = Math.round(1000 / val);
+  // 1–10×: one day per tick, interval shrinks as speed rises (100 ms–1 000 ms).
+  // 11–20×: keep a fixed 50 ms interval (20 ticks/s) and advance (val−10) days per
+  //   tick, giving effective speeds of 20–200 days/s — a smooth, linear progression
+  //   beyond the single-tick range.
+  if (val <= 10) {
+    speedMs = Math.round(1000 / val);
+    ticksPerStep = 1;
+  } else {
+    speedMs = 50;
+    ticksPerStep = val - 10; // 11× → 1 day/tick (20 days/s) … 20× → 10 days/tick (200 days/s)
+  }
   if (isPlaying) {
     clearInterval(playInterval);
     playInterval = setInterval(tick, speedMs);
