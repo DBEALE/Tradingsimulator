@@ -1402,7 +1402,7 @@
       </div>
       <div class="field">
         <label for="numIterationsInput">Iterations</label>
-        <input type="number" id="numIterationsInput" value="1" min="1" max="20" step="1" title="Run the simulation multiple times and compare bot performance across runs" />
+        <input type="number" id="numIterationsInput" value="1" min="1" max="1000" step="1" title="Run the simulation multiple times (1-1000 iterations) to compare performance. When you choose more than 1 iteration, runs auto-finish sequentially and show a combined completion summary." />
       </div>
       <div class="field" style="grid-column: 1 / -1;">
         <label>Bot Strategies (check to include in simulation)</label>
@@ -1707,6 +1707,7 @@ let transactions = [];
 let playInterval = null;
 let isPlaying = false;
 let isFinishing = false;
+let finishRafId = null; // rAF handle for the finishSimulation chunk loop
 let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
@@ -1889,7 +1890,7 @@ function startSimulation() {
   startingCapital = parseFloat(document.getElementById('startCapital').value) || 10000;
   totalDays = parseInt(document.getElementById('simPeriod').value);
   tradingCost = parseFloat(document.getElementById('tradingCostInput').value) || 0;
-  numIterations = Math.max(1, Math.min(20, parseInt(document.getElementById('numIterationsInput').value) || 1));
+  numIterations = Math.max(1, Math.min(1000, parseInt(document.getElementById('numIterationsInput').value) || 1));
   currentIteration = 1;
   iterationResults = [];
   const condition = document.getElementById('marketCondition').value;
@@ -1965,6 +1966,7 @@ function startSimulation() {
 
 function resetSimulation() {
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
+  if (finishRafId) { cancelAnimationFrame(finishRafId); finishRafId = null; }
   isPlaying = false;
   isFinishing = false;
   numIterations = 1;
@@ -2945,15 +2947,17 @@ function finishSimulation() {
   isFinishing = true;
   lockBotUI();
   const runChunk = () => {
+    if (!isFinishing) { finishRafId = null; return; } // canceled by reset
     const targetDay = Math.min(currentDay + FINISH_CHUNK_SIZE, totalDays);
     while (currentDay < targetDay) {
       currentDay++;
       if (botEnabled) runTradingScript();
     }
     if (currentDay < totalDays) {
-      requestAnimationFrame(runChunk);
+      finishRafId = requestAnimationFrame(runChunk);
       return;
     }
+    finishRafId = null;
     updateDay();
     isFinishing = false;
     showCompletionModal();
@@ -3020,19 +3024,21 @@ function showCompletionModal() {
 
   refreshBotComparisonData();
 
-  // Save this iteration's results
-  iterationResults.push({
-    iteration: currentIteration,
-    botData: botComparisonData.map(b => ({
-      key: b.key,
-      name: b.name,
-      color: b.color,
-      pnl: b.pnl,
-      total: b.total,
-      tradingCosts: b.tradingCosts,
-      transactions: b.transactions.length,
-    }))
-  });
+  // Save this iteration's results only once (guard against re-entry on repeat calls)
+  if (!iterationResults.some(r => r.iteration === currentIteration)) {
+    iterationResults.push({
+      iteration: currentIteration,
+      botData: botComparisonData.map(b => ({
+        key: b.key,
+        name: b.name,
+        color: b.color,
+        pnl: b.pnl,
+        total: b.total,
+        tradingCosts: b.tradingCosts,
+        transactions: b.transactions.length,
+      }))
+    });
+  }
 
   // If more iterations remain, auto-run next
   if (currentIteration < numIterations) {
@@ -3075,6 +3081,9 @@ function closeCompletionModal() {
  * to completion using the saved iterationConfig.
  */
 function runNextIteration() {
+  // Guard: if the simulation was reset mid-run, iterationConfig will be null
+  if (!iterationConfig || currentIteration < 1) return;
+
   const iterDisp = document.getElementById('iterationDisplay');
   iterDisp.textContent = `Run ${currentIteration} / ${numIterations}`;
   iterDisp.classList.remove('hidden');
