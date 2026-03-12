@@ -1274,6 +1274,17 @@
 
     .completion-footer .btn { flex: 1; }
 
+    /* ── Iteration display badge ── */
+    .iteration-display {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 8px;
+      white-space: nowrap;
+    }
+
     @media (max-width: 600px) {
       .completion-stat-grid { grid-template-columns: 1fr; }
       .completion-footer { padding: 0 14px 14px; gap: 8px; }
@@ -1389,6 +1400,10 @@
         <label>Trading Cost per Order ($)</label>
         <input type="number" id="tradingCostInput" value="5.00" min="0" step="0.01" />
       </div>
+      <div class="field">
+        <label for="numIterationsInput">Iterations</label>
+        <input type="number" id="numIterationsInput" value="1" min="1" max="1000" step="1" title="Run the simulation multiple times (1-1000 iterations) to compare performance. When you choose more than 1 iteration, runs auto-finish sequentially and show a combined completion summary." />
+      </div>
       <div class="field" style="grid-column: 1 / -1;">
         <label>Bot Strategies (check to include in simulation)</label>
         <div class="bot-strategy-list" id="botStrategyList">
@@ -1459,6 +1474,7 @@
             <button class="btn btn-secondary" onclick="finishSimulation()">Finish</button>
             <button class="btn btn-secondary" onclick="resetSimulation()">↺ Reset</button>
             <span class="day-display" id="dayDisplay">Day 0 / 0</span>
+            <span class="iteration-display hidden" id="iterationDisplay"></span>
           </div>
 
           <div class="speed-row">
@@ -1646,6 +1662,19 @@
             <tbody id="cmBotPnlTableBody"></tbody>
           </table>
         </div>
+        <div id="cmIterationSummary" class="hidden">
+          <h4 class="cm-section-title">Multi-Iteration Summary (<span id="cmIterCount">0</span> runs)</h4>
+          <div class="completion-stock-rows">
+            <table>
+              <thead>
+                <tr>
+                  <th>Bot</th><th>Avg P&amp;L</th><th>Avg Return</th><th>Best Run</th><th>Worst Run</th><th>Win Rate</th>
+                </tr>
+              </thead>
+              <tbody id="cmIterSummaryBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
     <div class="completion-footer">
@@ -1662,7 +1691,7 @@
 // ──────────────────────────────────────────────
 // State
 // ──────────────────────────────────────────────
-const APP_VERSION = '0.1.22';
+const APP_VERSION = '0.1.23';
 const appVersionEl = document.getElementById('appVersion');
 appVersionEl.textContent = APP_VERSION;
 appVersionEl.parentElement.style.visibility = 'visible';
@@ -1678,6 +1707,7 @@ let transactions = [];
 let playInterval = null;
 let isPlaying = false;
 let isFinishing = false;
+let finishRafId = null; // rAF handle for the finishSimulation chunk loop
 let activeStock = null;
 let visibleStocks = new Set(); // symbols currently shown on the chart
 let speedMs = 200;
@@ -1686,6 +1716,12 @@ let botComparisonData = [];
 let botColorMap = {}; // maps bot key -> assigned color, persists within a simulation
 let visibleBotTradeMarkers = new Set();
 let showBotTradeMarkers = true;
+
+// ── Multi-iteration state ──
+let numIterations = 1;
+let currentIteration = 0;
+let iterationResults = []; // array of { iteration, botData: [...] }
+let iterationConfig = null; // saved setup params for subsequent iterations
 
 const MIN_STOCK_PRICE = 0.01; // price floor to prevent stocks reaching zero
 const FINISH_CHUNK_SIZE = 50;
@@ -1854,8 +1890,12 @@ function startSimulation() {
   startingCapital = parseFloat(document.getElementById('startCapital').value) || 10000;
   totalDays = parseInt(document.getElementById('simPeriod').value);
   tradingCost = parseFloat(document.getElementById('tradingCostInput').value) || 0;
+  numIterations = Math.max(1, Math.min(1000, parseInt(document.getElementById('numIterationsInput').value) || 1));
+  currentIteration = 1;
+  iterationResults = [];
   const condition = document.getElementById('marketCondition').value;
   const numStocks = parseInt(document.getElementById('numStocks').value);
+  iterationConfig = { condition, numStocks };
   const marketParams = getMarketParams(condition);
   const { drift = 0, volMult = 1, phases } = marketParams;
 
@@ -1900,6 +1940,15 @@ function startSimulation() {
   document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
   document.getElementById('dayDisplay').textContent = 'Day 0 / ' + totalDays;
 
+  // Show/hide iteration display
+  const iterDisp = document.getElementById('iterationDisplay');
+  if (numIterations > 1) {
+    iterDisp.textContent = `Run ${currentIteration} / ${numIterations}`;
+    iterDisp.classList.remove('hidden');
+  } else {
+    iterDisp.classList.add('hidden');
+  }
+
   const botLogEl = document.getElementById('botLog');
   botLogEl.innerHTML = '';
   botLogEl.classList.add('hidden');
@@ -1917,8 +1966,13 @@ function startSimulation() {
 
 function resetSimulation() {
   if (playInterval) { clearInterval(playInterval); playInterval = null; }
+  if (finishRafId) { cancelAnimationFrame(finishRafId); finishRafId = null; }
   isPlaying = false;
   isFinishing = false;
+  numIterations = 1;
+  currentIteration = 0;
+  iterationResults = [];
+  iterationConfig = null;
   document.getElementById('simArea').classList.add('hidden');
   document.getElementById('setupPanel').classList.add('hidden');
   document.getElementById('landingPage').classList.remove('hidden');
@@ -2893,15 +2947,17 @@ function finishSimulation() {
   isFinishing = true;
   lockBotUI();
   const runChunk = () => {
+    if (!isFinishing) { finishRafId = null; return; } // canceled by reset
     const targetDay = Math.min(currentDay + FINISH_CHUNK_SIZE, totalDays);
     while (currentDay < targetDay) {
       currentDay++;
       if (botEnabled) runTradingScript();
     }
     if (currentDay < totalDays) {
-      requestAnimationFrame(runChunk);
+      finishRafId = requestAnimationFrame(runChunk);
       return;
     }
+    finishRafId = null;
     updateDay();
     isFinishing = false;
     showCompletionModal();
@@ -2966,11 +3022,46 @@ function showCompletionModal() {
     document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
   }
 
+  refreshBotComparisonData();
+
+  // Save this iteration's results only once (guard against re-entry on repeat calls)
+  if (!iterationResults.some(r => r.iteration === currentIteration)) {
+    iterationResults.push({
+      iteration: currentIteration,
+      botData: botComparisonData.map(b => ({
+        key: b.key,
+        name: b.name,
+        color: b.color,
+        pnl: b.pnl,
+        total: b.total,
+        tradingCosts: b.tradingCosts,
+        transactions: b.transactions.length,
+      }))
+    });
+  }
+
+  // If more iterations remain, auto-run next
+  if (currentIteration < numIterations) {
+    currentIteration++;
+    runNextIteration();
+    return;
+  }
+
+  // All iterations done — populate and show modal
   document.getElementById('cmStartCapital').textContent = '$' + startingCapital.toFixed(2);
   document.getElementById('cmSimDays').textContent = String(totalDays);
 
-  refreshBotComparisonData();
+  // refreshBotComparisonData() was already called above; renderBotComparison() depends on it.
   renderBotComparison();
+
+  const iterSummary = document.getElementById('cmIterationSummary');
+  if (numIterations > 1) {
+    document.getElementById('cmIterCount').textContent = String(numIterations);
+    renderIterationSummary();
+    iterSummary.classList.remove('hidden');
+  } else {
+    iterSummary.classList.add('hidden');
+  }
 
   document.getElementById('completionModal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -2979,6 +3070,129 @@ function showCompletionModal() {
 function closeCompletionModal() {
   document.getElementById('completionModal').classList.add('hidden');
   document.body.style.overflow = '';
+}
+
+// ──────────────────────────────────────────────
+// Multi-iteration helpers
+// ──────────────────────────────────────────────
+
+/**
+ * Regenerate stocks, reset simulation state, and auto-run the next iteration
+ * to completion using the saved iterationConfig.
+ */
+function runNextIteration() {
+  // Guard: if the simulation was reset mid-run, iterationConfig will be null
+  if (!iterationConfig || currentIteration < 1) return;
+
+  const iterDisp = document.getElementById('iterationDisplay');
+  iterDisp.textContent = `Run ${currentIteration} / ${numIterations}`;
+  iterDisp.classList.remove('hidden');
+
+  showNotification(`Starting run ${currentIteration} of ${numIterations}…`);
+
+  const { condition, numStocks } = iterationConfig;
+  const marketParams = getMarketParams(condition);
+  const { drift = 0, volMult = 1, phases } = marketParams;
+
+  // Regenerate stock pool with new random prices
+  const arr = buildStockPool(numStocks);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  const templates = arr.slice(0, numStocks);
+
+  stocks = templates.map((t, i) => ({
+    ...t,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+    prices: generatePriceSeries(t, totalDays, drift, volMult, phases),
+  }));
+
+  cash = startingCapital;
+  holdings = {};
+  transactions = [];
+  currentDay = 0;
+  isPlaying = false;
+  isFinishing = false;
+  botComparisonData = [];
+  // Keep botColorMap so colors are consistent across iterations
+  visibleBotTradeMarkers = new Set();
+  showBotTradeMarkers = true;
+
+  if (playInterval) { clearInterval(playInterval); playInterval = null; }
+
+  buildStockTabs();
+  setActiveStock(stocks[0].symbol);
+  updateStockThumbnails();
+  updateMarketTable();
+  refreshBotComparisonData();
+  renderBotPnlChart();
+
+  document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
+  document.getElementById('dayDisplay').textContent = 'Day 0 / ' + totalDays;
+
+  // Auto-finish without user interaction
+  finishSimulation();
+}
+
+/**
+ * Render the cross-iteration summary table in the completion modal.
+ * Groups results by bot and shows avg P&L, best/worst run, and win rate.
+ */
+function renderIterationSummary() {
+  const tbody = document.getElementById('cmIterSummaryBody');
+  if (!tbody) return;
+
+  // Collect all unique bots
+  const botMap = {}; // key -> { name, color, pnls: [] }
+  iterationResults.forEach(iter => {
+    iter.botData.forEach(b => {
+      if (!botMap[b.key]) {
+        botMap[b.key] = { name: b.name, color: b.color, pnls: [] };
+      }
+      botMap[b.key].pnls.push(b.pnl);
+    });
+  });
+
+  const bots = Object.values(botMap);
+  if (bots.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-faint)">No bots ran.</td></tr>';
+    return;
+  }
+
+  // Sort by average P&L descending
+  bots.sort((a, b) => {
+    const avgA = a.pnls.reduce((s, v) => s + v, 0) / a.pnls.length;
+    const avgB = b.pnls.reduce((s, v) => s + v, 0) / b.pnls.length;
+    return avgB - avgA;
+  });
+
+  tbody.innerHTML = '';
+  bots.forEach(bot => {
+    const n = bot.pnls.length;
+    const avgPnl = bot.pnls.reduce((s, v) => s + v, 0) / n;
+    const bestPnl = Math.max(...bot.pnls);
+    const worstPnl = Math.min(...bot.pnls);
+    const wins = bot.pnls.filter(p => p >= 0).length;
+    const winRate = (wins / n * 100).toFixed(0);
+    const avgReturn = startingCapital !== 0 ? (avgPnl / startingCapital * 100) : 0;
+
+    const avgColor = avgPnl >= 0 ? '#22c55e' : '#ef4444';
+    const bestColor = '#22c55e';
+    const worstColor = worstPnl >= 0 ? '#22c55e' : '#ef4444';
+
+    const formatPnl = (v) => (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2);
+
+    const row = document.createElement('tr');
+    row.innerHTML =
+      `<td style="font-weight:600"><span class="bot-color-dot" style="background:${escapeHtml(bot.color)};margin-right:6px"></span>${escapeHtml(bot.name)}</td>` +
+      `<td style="color:${avgColor}">${formatPnl(avgPnl)}</td>` +
+      `<td style="color:${avgColor}">${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(2)}%</td>` +
+      `<td style="color:${bestColor}">${formatPnl(bestPnl)}</td>` +
+      `<td style="color:${worstColor}">${formatPnl(worstPnl)}</td>` +
+      `<td>${winRate}%</td>`;
+    tbody.appendChild(row);
+  });
 }
 
 // ──────────────────────────────────────────────
