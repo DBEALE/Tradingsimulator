@@ -969,17 +969,6 @@
       font-size: 1.8rem;
     }
 
-    /* ── Market Overview stat bar ── */
-    .market-stat-bar {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    .market-stat-bar .stat-box .label { font-size: 0.7rem; }
-    .market-stat-bar .stat-box .value { font-size: 0.95rem; }
-    .market-stat-bar .stat-box .sub   { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
 
     /* ── Scrollable stock tabs for many stocks ── */
     .stock-tabs {
@@ -1482,23 +1471,7 @@
         <!-- Market Overview mini table -->
         <div class="card">
           <h3>Market Overview</h3>
-          <div class="market-stat-bar" id="marketStatBar">
-            <div class="stat-box">
-              <div class="label">Market Value</div>
-              <div class="value" id="msvMarketValue">—</div>
-              <div class="sub" id="msvMarketValueSub">&nbsp;</div>
-            </div>
-            <div class="stat-box">
-              <div class="label">Daily Movement</div>
-              <div class="value" id="msvDailyMove">—</div>
-              <div class="sub" id="msvDailyMoveSub">&nbsp;</div>
-            </div>
-            <div class="stat-box">
-              <div class="label">Overall Movement</div>
-              <div class="value" id="msvOverallMove">—</div>
-              <div class="sub" id="msvOverallMoveSub">&nbsp;</div>
-            </div>
-          </div>
+
           <div class="table-scroll" id="marketTableWrap">
           <table class="holdings-table" id="marketTable">
             <thead>
@@ -2738,47 +2711,38 @@ function updateMarketTable() {
     drawTableSparkline(sparklineCanvas, sparklinePrices, sparklineColor);
   });
 
-  // ── Market stat bar ──────────────────────────────────────────────────────────
-  if (stocks.length > 0) {
-    const dailyChangePct  = sumOpenPrices  !== 0 ? (sumDailyChange  / sumOpenPrices)  * 100 : 0;
-    const overallPct      = sumStartPrices !== 0 ? (sumTotalChange  / sumStartPrices) * 100 : 0;
-    const dailyColor      = sumDailyChange  >= 0 ? '#22c55e' : '#ef4444';
-    const overallColor    = sumTotalChange  >= 0 ? '#22c55e' : '#ef4444';
-    const formatSign = v => v >= 0 ? '+' : '-';
-
-    document.getElementById('msvMarketValue').textContent    = `$${sumCurrentPrices.toFixed(2)}`;
-    document.getElementById('msvMarketValueSub').textContent = `${stocks.length} stock${stocks.length !== 1 ? 's' : ''}`;
-
-    const mvEl = document.getElementById('msvDailyMove');
-    mvEl.textContent  = `${formatSign(sumDailyChange)}$${Math.abs(sumDailyChange).toFixed(2)}`;
-    mvEl.style.color  = dailyColor;
-    document.getElementById('msvDailyMoveSub').textContent   = `${formatSign(dailyChangePct)}${Math.abs(dailyChangePct).toFixed(2)}% today`;
-
-    const ovEl = document.getElementById('msvOverallMove');
-    ovEl.textContent  = `${formatSign(sumTotalChange)}$${Math.abs(sumTotalChange).toFixed(2)}`;
-    ovEl.style.color  = overallColor;
-    document.getElementById('msvOverallMoveSub').textContent = `${formatSign(overallPct)}${Math.abs(overallPct).toFixed(2)}% from start`;
-  }
-
   // ── Summary footer row ───────────────────────────────────────────────────────
   const tfoot = document.getElementById('marketTableFoot');
   tfoot.innerHTML = '';
   if (stocks.length > 0) {
-    const avgHigh      = sumHigh / stocks.length;
-    const avgLow       = sumLow  / stocks.length;
-    const totalPct     = sumStartPrices !== 0 ? (sumTotalChange / sumStartPrices) * 100 : 0;
-    const summaryColor = sumTotalChange >= 0 ? '#22c55e' : '#ef4444';
-    const summaryRow   = document.createElement('tr');
+    const dailyChangePct = sumOpenPrices  !== 0 ? (sumDailyChange  / sumOpenPrices)  * 100 : 0;
+    const totalPct       = sumStartPrices !== 0 ? (sumTotalChange  / sumStartPrices) * 100 : 0;
+    const dailyColor     = sumDailyChange  >= 0 ? '#22c55e' : '#ef4444';
+    const summaryColor   = sumTotalChange  >= 0 ? '#22c55e' : '#ef4444';
+
+    const summaryRow = document.createElement('tr');
     summaryRow.style.borderTop  = '2px solid var(--border)';
     summaryRow.style.fontWeight = '600';
     summaryRow.innerHTML =
       `<td>Market Summary</td>` +
-      `<td></td><td></td><td></td><td></td>` +
-      `<td>$${avgHigh.toFixed(2)}</td>` +
-      `<td>$${avgLow.toFixed(2)}</td>` +
-      `<td style="color:${summaryColor}">${sumTotalChange >= 0 ? '+' : ''}$${Math.abs(sumTotalChange).toFixed(2)}</td>` +
+      `<td><canvas class="table-thumbnail" aria-label="Market summary sparkline"></canvas></td>` +
+      `<td>$${sumCurrentPrices.toFixed(2)}</td>` +
+      `<td style="color:${dailyColor}">${sumDailyChange >= 0 ? '+' : ''}${sumDailyChange.toFixed(2)}</td>` +
+      `<td style="color:${dailyColor}">${dailyChangePct >= 0 ? '+' : ''}${dailyChangePct.toFixed(2)}%</td>` +
+      `<td>$${sumHigh.toFixed(2)}</td>` +
+      `<td>$${sumLow.toFixed(2)}</td>` +
+      `<td style="color:${summaryColor}">${sumTotalChange >= 0 ? '+' : '-'}$${Math.abs(sumTotalChange).toFixed(2)}</td>` +
       `<td style="color:${summaryColor}">${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(2)}%</td>`;
     tfoot.appendChild(summaryRow);
+
+    // Build per-day sum of all stock prices for the summary sparkline
+    const numDays = currentDay + 1;
+    const sumPricesPerDay = Array.from({ length: numDays }, (_, d) =>
+      stocks.reduce((acc, s) => acc + (s.prices[d] || 0), 0)
+    );
+    const sparklineCanvas = summaryRow.querySelector('.table-thumbnail');
+    const sparklineColor = sumPricesPerDay.length > 1 && sumPricesPerDay[sumPricesPerDay.length - 1] >= sumPricesPerDay[0] ? '#22c55e' : '#ef4444';
+    drawTableSparkline(sparklineCanvas, sumPricesPerDay, sparklineColor);
   }
 }
 
