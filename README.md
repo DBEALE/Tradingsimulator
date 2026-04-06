@@ -1,3 +1,5 @@
+published: https://dbeale.github.io/Tradingsimulator/
+
 # Stock Market Simulator
 
 A browser-based stock market simulator that lets you practise trading strategies without risking real money. Configure a virtual market, watch prices move in real time, and automate strategies with the built-in JavaScript trading bot.
