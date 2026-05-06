@@ -1811,11 +1811,11 @@ const REAL_STOCKS_UK = [
   { name: 'HSBC Holdings plc',    symbol: 'HSBA',  stooq: 'hsba.uk' },
   { name: 'Unilever plc',         symbol: 'ULVR',  stooq: 'ulvr.uk' },
   { name: 'Rio Tinto plc',        symbol: 'RIO',   stooq: 'rio.uk'  },
-  { name: 'BP plc',               symbol: 'BP',    stooq: 'bp..uk'  },
+  { name: 'BP plc',               symbol: 'BP',    stooq: 'bp.uk'   },
   { name: 'GSK plc',              symbol: 'GSK',   stooq: 'gsk.uk'  },
   { name: 'Diageo plc',           symbol: 'DGE',   stooq: 'dge.uk'  },
   { name: 'Barclays plc',         symbol: 'BARC',  stooq: 'barc.uk' },
-  { name: 'Rolls-Royce Holdings', symbol: 'RR',    stooq: 'rr..uk'  },
+  { name: 'Rolls-Royce Holdings', symbol: 'RR',    stooq: 'rr.uk'   },
 ];
 
 /**
@@ -2098,8 +2098,11 @@ async function startSimulation() {
         );
       }
 
-      // Determine simulation length from the longest price series available
-      totalDays = Math.max(...validPrices.map(p => p.length));
+      // totalDays = last valid price index, consistent with GBM convention where
+      // generatePriceSeries(t, days) produces prices[0..days] (length = days + 1).
+      // The longest fetched series has length L, so its last valid index is L - 1.
+      const maxLen = Math.max(...validPrices.map(p => p.length));
+      totalDays = maxLen - 1;
 
       stocks = validStocks.map((s, i) => ({
         name:       s.name,
@@ -2109,9 +2112,9 @@ async function startSimulation() {
         prices:     validPrices[i],
       }));
 
-      // Pad shorter series to totalDays by holding last price
+      // Pad shorter series to maxLen elements so prices[totalDays] is always valid
       stocks.forEach(s => {
-        while (s.prices.length <= totalDays) {
+        while (s.prices.length < maxLen) {
           s.prices.push(s.prices[s.prices.length - 1]);
         }
       });
