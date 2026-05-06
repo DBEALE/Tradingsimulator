@@ -1327,7 +1327,7 @@
         <div class="step-card">
           <div class="step-number">1</div>
           <h3>Configure</h3>
-          <p>Choose your starting capital, simulation period, market condition (including dot-com, financial crisis, or COVID scenarios), number of stocks (1, 5, 10, 25, or 100), and a $5 default trading cost.</p>
+          <p>Choose your starting capital, simulation period, market condition (including dot-com, financial crisis, or COVID scenarios), number of stocks (1, 5, 10, 25, or 100), and a $5 default trading cost. Or switch to <strong>Real Historical Prices</strong> to replay actual closing prices for real US or UK companies.</p>
         </div>
         <div class="step-card">
           <div class="step-number">2</div>
@@ -1364,6 +1364,13 @@
         <input type="number" id="startCapital" value="10000" min="100" step="100" />
       </div>
       <div class="field">
+        <label>Price Data</label>
+        <select id="priceMode" onchange="onPriceModeChange()">
+          <option value="simulated" selected>Simulated (GBM)</option>
+          <option value="real">Real Historical Prices</option>
+        </select>
+      </div>
+      <div class="field" id="simPeriodField">
         <label>Simulation Period</label>
         <select id="simPeriod">
           <option value="30">1 Month (30 days)</option>
@@ -1374,7 +1381,7 @@
           <option value="1825">5 Years (1825 days)</option>
         </select>
       </div>
-      <div class="field">
+      <div class="field" id="marketConditionField">
         <label>Market Condition</label>
         <select id="marketCondition">
           <option value="bull">Bull Market (trending up)</option>
@@ -1384,6 +1391,23 @@
           <option value="dotcom">Dot-com Boom &amp; Bust</option>
           <option value="financial">2008 Financial Crisis</option>
           <option value="covid">COVID Crash &amp; Recovery</option>
+        </select>
+      </div>
+      <div class="field hidden" id="realMarketField">
+        <label>Market</label>
+        <select id="realMarket">
+          <option value="us" selected>US Stocks (NYSE / NASDAQ)</option>
+          <option value="uk">UK Stocks (LSE)</option>
+        </select>
+      </div>
+      <div class="field hidden" id="realYearField">
+        <label>Historical Year</label>
+        <select id="realYear">
+          <option value="2020">2020</option>
+          <option value="2021">2021</option>
+          <option value="2022">2022</option>
+          <option value="2023" selected>2023</option>
+          <option value="2024">2024</option>
         </select>
       </div>
       <div class="field">
@@ -1583,9 +1607,11 @@
         <thead><tr><th>Option</th><th>Description</th></tr></thead>
         <tbody>
           <tr><td><strong>Starting Capital</strong></td><td>The cash balance you begin with (default $10,000).</td></tr>
-          <tr><td><strong>Simulation Period</strong></td><td>Number of trading days to simulate (30 days – 5 years).</td></tr>
-          <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), High Volatility, Dot-com Boom &amp; Bust, 2008 Financial Crisis, or COVID Crash &amp; Recovery.</td></tr>
-          <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (1, 5, 10, 25, or 100).</td></tr>
+          <tr><td><strong>Price Data</strong></td><td><em>Simulated (GBM)</em> generates random prices using Geometric Brownian Motion. <em>Real Historical Prices</em> fetches actual daily closing prices from stooq.com — internet access required.</td></tr>
+          <tr><td><strong>Simulation Period</strong></td><td>Number of trading days to simulate (30 days – 5 years). Hidden in Real Historical mode (the full calendar year is used instead).</td></tr>
+          <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), High Volatility, Dot-com Boom &amp; Bust, 2008 Financial Crisis, or COVID Crash &amp; Recovery. Hidden in Real Historical mode.</td></tr>
+          <tr><td><strong>Market / Historical Year</strong></td><td>Visible in Real Historical mode. Choose <em>US Stocks</em> (NYSE/NASDAQ, up to 15 companies) or <em>UK Stocks</em> (LSE, up to 10 companies) and the calendar year to replay (2020–2024, default 2023).</td></tr>
+          <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (1, 5, 10, 25, or 100). In Real Historical mode the pool is capped at the number of available real companies.</td></tr>
           <tr><td><strong>Trading Cost</strong></td><td>Flat fee deducted from each buy or sell order (default $5.00).</td></tr>
           <tr><td><strong>Bot Strategies</strong></td><td>Check one or more strategies to include in the simulation. Checking a strategy loads its script into the editor. You can also write and save a custom bot.</td></tr>
         </tbody>
@@ -1759,6 +1785,39 @@ const STOCK_TEMPLATES = [
   { name: 'YieldMax',    symbol: 'YLDM', basePrice: 156, volatility: 0.016, drift: 0.0003 },
 ];
 
+// ── Real historical stock definitions ──
+// stooq field is the ticker used to fetch from stooq.com's public CSV API.
+const REAL_STOCKS_US = [
+  { name: 'Apple Inc.',           symbol: 'AAPL',  stooq: 'aapl.us'  },
+  { name: 'Microsoft Corp.',      symbol: 'MSFT',  stooq: 'msft.us'  },
+  { name: 'Amazon.com',           symbol: 'AMZN',  stooq: 'amzn.us'  },
+  { name: 'Alphabet Inc.',        symbol: 'GOOGL', stooq: 'googl.us' },
+  { name: 'Meta Platforms',       symbol: 'META',  stooq: 'meta.us'  },
+  { name: 'Tesla Inc.',           symbol: 'TSLA',  stooq: 'tsla.us'  },
+  { name: 'NVIDIA Corp.',         symbol: 'NVDA',  stooq: 'nvda.us'  },
+  { name: 'JPMorgan Chase',       symbol: 'JPM',   stooq: 'jpm.us'   },
+  { name: 'Johnson & Johnson',    symbol: 'JNJ',   stooq: 'jnj.us'   },
+  { name: 'ExxonMobil Corp.',     symbol: 'XOM',   stooq: 'xom.us'   },
+  { name: 'Visa Inc.',            symbol: 'V',     stooq: 'v.us'     },
+  { name: 'Walmart Inc.',         symbol: 'WMT',   stooq: 'wmt.us'   },
+  { name: 'Procter & Gamble',     symbol: 'PG',    stooq: 'pg.us'    },
+  { name: 'UnitedHealth Group',   symbol: 'UNH',   stooq: 'unh.us'   },
+  { name: 'Netflix Inc.',         symbol: 'NFLX',  stooq: 'nflx.us'  },
+];
+
+const REAL_STOCKS_UK = [
+  { name: 'AstraZeneca plc',      symbol: 'AZN',   stooq: 'azn.uk'  },
+  { name: 'Shell plc',            symbol: 'SHEL',  stooq: 'shel.uk' },
+  { name: 'HSBC Holdings plc',    symbol: 'HSBA',  stooq: 'hsba.uk' },
+  { name: 'Unilever plc',         symbol: 'ULVR',  stooq: 'ulvr.uk' },
+  { name: 'Rio Tinto plc',        symbol: 'RIO',   stooq: 'rio.uk'  },
+  { name: 'BP plc',               symbol: 'BP',    stooq: 'bp.uk'   },
+  { name: 'GSK plc',              symbol: 'GSK',   stooq: 'gsk.uk'  },
+  { name: 'Diageo plc',           symbol: 'DGE',   stooq: 'dge.uk'  },
+  { name: 'Barclays plc',         symbol: 'BARC',  stooq: 'barc.uk' },
+  { name: 'Rolls-Royce Holdings', symbol: 'RR',    stooq: 'rr.uk'   },
+];
+
 /**
  * Returns a pool of n stock configurations. For n > STOCK_TEMPLATES.length,
  * additional stocks are generated deterministically from sector/name patterns.
@@ -1883,36 +1942,70 @@ function getMarketParams(condition) {
 }
 
 // ──────────────────────────────────────────────
-// Start / Reset
+// Real Historical Price helpers
 // ──────────────────────────────────────────────
 
-function startSimulation() {
-  startingCapital = parseFloat(document.getElementById('startCapital').value) || 10000;
-  totalDays = parseInt(document.getElementById('simPeriod').value);
-  tradingCost = parseFloat(document.getElementById('tradingCostInput').value) || 0;
-  numIterations = Math.max(1, Math.min(1000, parseInt(document.getElementById('numIterationsInput').value) || 1));
-  currentIteration = 1;
-  iterationResults = [];
-  const condition = document.getElementById('marketCondition').value;
-  const numStocks = parseInt(document.getElementById('numStocks').value);
-  iterationConfig = { condition, numStocks };
-  const marketParams = getMarketParams(condition);
-  const { drift = 0, volMult = 1, phases } = marketParams;
-
-  // Build full pool, shuffle, pick numStocks
-  const arr = buildStockPool(numStocks);
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+/**
+ * Toggle visibility of setup fields based on the selected price mode.
+ */
+function onPriceModeChange() {
+  const isReal = document.getElementById('priceMode').value === 'real';
+  document.getElementById('simPeriodField').classList.toggle('hidden', isReal);
+  document.getElementById('marketConditionField').classList.toggle('hidden', isReal);
+  document.getElementById('realMarketField').classList.toggle('hidden', !isReal);
+  document.getElementById('realYearField').classList.toggle('hidden', !isReal);
+  // Iterations don't apply to historical replay; lock to 1
+  const iterEl = document.getElementById('numIterationsInput');
+  if (isReal) {
+    iterEl.value = '1';
+    iterEl.disabled = true;
+  } else {
+    iterEl.disabled = false;
   }
-  const templates = arr.slice(0, numStocks);
+}
 
-  stocks = templates.map((t, i) => ({
-    ...t,
-    color: CHART_COLORS[i % CHART_COLORS.length],
-    prices: generatePriceSeries(t, totalDays, drift, volMult, phases),
-  }));
+/**
+ * Parse a stooq.com CSV response (newest-first) into an array of closing
+ * prices sorted oldest-first.
+ * @param {string} csvText
+ * @returns {number[]}
+ */
+function parseStooqCSV(csvText) {
+  const lines = csvText.trim().split('\n');
+  const prices = [];
+  // stooq returns data newest-first; iterate in reverse to get oldest-first
+  for (let i = lines.length - 1; i >= 1; i--) {
+    const parts = lines[i].split(',');
+    if (parts.length >= 5) {
+      const close = parseFloat(parts[4]);
+      if (!isNaN(close) && close > 0) prices.push(+close.toFixed(2));
+    }
+  }
+  return prices;
+}
 
+/**
+ * Fetch historical daily closing prices from stooq.com for a given ticker and year.
+ * @param {string} stooqSymbol  e.g. "aapl.us"
+ * @param {number} year         e.g. 2023
+ * @returns {Promise<number[]>} array of closing prices, oldest-first
+ */
+async function fetchStooqPrices(stooqSymbol, year) {
+  const d1 = `${year}0101`;
+  const d2 = `${year}1231`;
+  const url = `https://stooq.com/q/d/l/?s=${stooqSymbol}&d1=${d1}&d2=${d2}&i=d`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`HTTP ${response.status} for ${stooqSymbol}`);
+  const csv = await response.text();
+  const prices = parseStooqCSV(csv);
+  if (prices.length < 2) throw new Error(`No data returned for ${stooqSymbol} in ${year}`);
+  return prices;
+}
+
+// ──────────────────────────────────────────────
+// Shared simulation initialiser (called once stocks[] is populated)
+// ──────────────────────────────────────────────
+function initSimulationUI() {
   cash = startingCapital;
   holdings = {};
   transactions = [];
@@ -1940,7 +2033,6 @@ function startSimulation() {
   document.getElementById('playPauseBtn').textContent = '\u25b6 Play';
   document.getElementById('dayDisplay').textContent = 'Day 0 / ' + totalDays;
 
-  // Show/hide iteration display
   const iterDisp = document.getElementById('iterationDisplay');
   if (numIterations > 1) {
     iterDisp.textContent = `Run ${currentIteration} / ${numIterations}`;
@@ -1955,13 +2047,115 @@ function startSimulation() {
 
   botEnabled = true;
 
-  // Keep bot controls editable on day 0; lock once simulation advances.
-
-  // Sync speedMs / ticksPerStep with whatever the slider currently shows, so that
-  // pressing Play immediately uses the right interval without requiring the user to
-  // move the slider again after each reset.
   const sliderVal = parseInt(document.getElementById('speedSlider').value, 10);
   updateSpeed(sliderVal);
+}
+
+// ──────────────────────────────────────────────
+// Start / Reset
+// ──────────────────────────────────────────────
+
+async function startSimulation() {
+  const priceMode = document.getElementById('priceMode').value;
+  startingCapital = parseFloat(document.getElementById('startCapital').value) || 10000;
+  tradingCost = parseFloat(document.getElementById('tradingCostInput').value) || 0;
+
+  if (priceMode === 'real') {
+    // ── Real Historical Prices path ──
+    const year = parseInt(document.getElementById('realYear').value, 10);
+    const market = document.getElementById('realMarket').value;
+    const numStocksReq = parseInt(document.getElementById('numStocks').value, 10);
+    const stockPool = market === 'uk' ? REAL_STOCKS_UK : REAL_STOCKS_US;
+    const selected = stockPool.slice(0, Math.min(numStocksReq, stockPool.length));
+
+    numIterations = 1;
+    currentIteration = 1;
+    iterationResults = [];
+    iterationConfig = { priceMode: 'real', market, year, numStocks: selected.length };
+
+    const btn = document.getElementById('startBtn');
+    btn.disabled = true;
+    btn.textContent = 'Loading data…';
+
+    try {
+      const results = await Promise.allSettled(
+        selected.map(s => fetchStooqPrices(s.stooq, year))
+      );
+
+      // Keep only stocks whose data loaded successfully
+      const validStocks = [];
+      const validPrices = [];
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value.length >= 2) {
+          validStocks.push(selected[i]);
+          validPrices.push(r.value);
+        }
+      });
+
+      if (validStocks.length === 0) {
+        throw new Error(
+          'No price data could be loaded. Check your internet connection and try again.'
+        );
+      }
+
+      // totalDays = last valid price index, consistent with GBM convention where
+      // generatePriceSeries(t, days) produces prices[0..days] (length = days + 1).
+      // The longest fetched series has length L, so its last valid index is L - 1.
+      const maxLen = Math.max(...validPrices.map(p => p.length));
+      totalDays = maxLen - 1;
+
+      stocks = validStocks.map((s, i) => ({
+        name:       s.name,
+        symbol:     s.symbol,
+        basePrice:  validPrices[i][0],
+        color:      CHART_COLORS[i % CHART_COLORS.length],
+        prices:     validPrices[i],
+      }));
+
+      // Pad shorter series to maxLen elements so prices[totalDays] is always valid
+      stocks.forEach(s => {
+        while (s.prices.length < maxLen) {
+          s.prices.push(s.prices[s.prices.length - 1]);
+        }
+      });
+
+      initSimulationUI();
+
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Start Simulation';
+      alert('Could not load historical prices: ' + err.message +
+            '\n\nTip: stooq.com may be temporarily unavailable or your browser may be blocking cross-origin requests. Try again or switch to Simulated mode.');
+    }
+    return;
+  }
+
+  // ── Simulated (GBM) path ──
+  totalDays = parseInt(document.getElementById('simPeriod').value);
+  numIterations = Math.max(1, Math.min(1000, parseInt(document.getElementById('numIterationsInput').value) || 1));
+  currentIteration = 1;
+  iterationResults = [];
+  const condition = document.getElementById('marketCondition').value;
+  const numStocks = parseInt(document.getElementById('numStocks').value);
+  iterationConfig = { priceMode: 'simulated', condition, numStocks };
+  const marketParams = getMarketParams(condition);
+  const { drift = 0, volMult = 1, phases } = marketParams;
+
+  // Build full pool, shuffle, pick numStocks
+  const arr = buildStockPool(numStocks);
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  const templates = arr.slice(0, numStocks);
+
+  stocks = templates.map((t, i) => ({
+    ...t,
+    color: CHART_COLORS[i % CHART_COLORS.length],
+    prices: generatePriceSeries(t, totalDays, drift, volMult, phases),
+  }));
+
+  initSimulationUI();
 }
 
 function resetSimulation() {
