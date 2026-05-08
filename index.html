@@ -4089,8 +4089,11 @@ function aboveMA(sym, period) {
 const portValue = availCash + Object.entries(holdings).reduce(
   (s, [sym, h]) => s + (prices[sym] ?? 0) * h.shares, 0
 );
-const allSyms  = Object.keys(prices);
-const heldSyms = Object.keys(holdings);
+const allSyms    = Object.keys(prices);
+const heldSyms   = Object.keys(holdings);
+// Cap positions at the number of stocks actually available — on a 3-stock
+// simulation, dividing by MAX_POSITIONS=8 would leave 62% in cash forever.
+const effectiveMax = Math.max(1, Math.min(MAX_POSITIONS, allSyms.length));
 
 // Accurate live position count: snapshot positions, minus what we sold
 // this tick, plus what we bought this tick.
@@ -4118,7 +4121,7 @@ for (const [sym, pos] of Object.entries(holdings)) {
 // ════════════════════════════════════════════════════════════════════════════
 
 if (day <= DEPLOY_DAYS) {
-  const need = MAX_POSITIONS - posCount();
+  const need = effectiveMax - posCount();
   if (need > 0) {
     // Momentum window: max(day-1, 1) so we get at least 1-day return from
     // day 2 onward. On day 1 getMom returns 0 for all stocks (no prior
@@ -4134,12 +4137,12 @@ if (day <= DEPLOY_DAYS) {
       .map(c => c.s);
 
     for (const sym of candidates) {
-      if (posCount() >= MAX_POSITIONS) break;
-      // Allocate portValue / MAX_POSITIONS per stock (equal weight on
+      if (posCount() >= effectiveMax) break;
+      // Allocate portValue / effectiveMax per stock (equal weight on
       // initial entry). We don't use inv-vol sizing here because with
       // <2 days of history the volatility estimate would be unreliable
       // and equal-weight IS the correct uninformed prior.
-      const alloc = Math.min(portValue / MAX_POSITIONS, availCash * 0.95);
+      const alloc = Math.min(portValue / effectiveMax, availCash * 0.95);
       if (alloc < MIN_ALLOC) continue;
       const shares = Math.floor(alloc / prices[sym]);
       if (shares > 0) {
@@ -4192,7 +4195,7 @@ else if (day > 30 && day % REBAL_EVERY === 0) {
     soldSet.add(loser);
     availCash += pos.shares * prices[loser];
 
-    const alloc = Math.min(portValue / MAX_POSITIONS, availCash * 0.90);
+    const alloc = Math.min(portValue / effectiveMax, availCash * 0.90);
     if (alloc >= MIN_ALLOC) {
       const shares = Math.floor(alloc / prices[repl.s]);
       if (shares > 0) {
@@ -4215,7 +4218,7 @@ else if (day > 30 && day % REBAL_EVERY === 0) {
 // discretionary swap. The MA20 filter and momentum floor are still applied
 // to avoid re-investing into stocks that are actively falling.
 
-if (day > DEPLOY_DAYS && posCount() < MAX_POSITIONS && availCash >= MIN_ALLOC * 2) {
+if (day > DEPLOY_DAYS && posCount() < effectiveMax && availCash >= MIN_ALLOC * 2) {
   const eligible = allSyms
     .filter(s => !holdings[s] && !soldSet.has(s) && !boughtSet.has(s))
     .filter(s => aboveMA(s, 20))          // quality gate: must be in uptrend
@@ -4224,8 +4227,8 @@ if (day > DEPLOY_DAYS && posCount() < MAX_POSITIONS && availCash >= MIN_ALLOC * 
     .sort((a, b) => b.mom - a.mom);
 
   for (const { s: sym } of eligible) {
-    if (posCount() >= MAX_POSITIONS) break;
-    const alloc = Math.min(portValue / MAX_POSITIONS, availCash * 0.95);
+    if (posCount() >= effectiveMax) break;
+    const alloc = Math.min(portValue / effectiveMax, availCash * 0.95);
     if (alloc < MIN_ALLOC) break;
     const shares = Math.floor(alloc / prices[sym]);
     if (shares > 0) {
