@@ -1316,7 +1316,7 @@
 <div class="container">
 
   <!-- Landing Page -->
-  <div id="landingPage">
+  <div id="landingPage" class="hidden">
     <div class="landing">
       <div class="landing-hero">
         <h2>Practice Trading Without Any Risk</h2>
@@ -1357,7 +1357,7 @@
   </div>
 
   <!-- Setup Panel -->
-  <div class="setup-panel hidden" id="setupPanel">
+  <div class="setup-panel" id="setupPanel">
     <h2>Simulation Setup</h2>
     <div class="setup-grid">
       <div class="field">
@@ -1430,7 +1430,7 @@
         <input type="number" id="numIterationsInput" value="1" min="1" max="1000" step="1" title="Run the simulation multiple times (1-1000 iterations) to compare performance. When you choose more than 1 iteration, runs auto-finish sequentially and show a combined completion summary." />
       </div>
       <div class="field" style="grid-column: 1 / -1;">
-        <label>Bot Strategies (check to include in simulation)</label>
+        <label>Bot Strategies (check to include in simulation) — <a href="#" onclick="toggleAllBots(event)" id="selectAllBotsLink">select all</a></label>
         <div class="bot-strategy-list" id="botStrategyList">
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="sma" checked onchange="onBotStrategyCheck(this)"> Simple Moving Average (SMA)</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="rsi" onchange="onBotStrategyCheck(this)"> RSI (Relative Strength Index)</label>
@@ -2148,6 +2148,17 @@ function resetSimulation() {
 function showSetup() {
   document.getElementById('landingPage').classList.add('hidden');
   document.getElementById('setupPanel').classList.remove('hidden');
+}
+
+function toggleAllBots(e) {
+  e.preventDefault();
+  const checkboxes = document.querySelectorAll('#botStrategyList input[type=checkbox]');
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  checkboxes.forEach(cb => {
+    cb.checked = !allChecked;
+    onBotStrategyCheck(cb);
+  });
+  document.getElementById('selectAllBotsLink').textContent = allChecked ? 'select all' : 'deselect all';
 }
 
 // ──────────────────────────────────────────────
