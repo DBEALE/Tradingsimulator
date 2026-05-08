@@ -1299,6 +1299,7 @@
       #cmBotRows td:nth-child(3) { display: none; }
     }
   </style>
+  <script src="data/prices.js"></script>
 </head>
 <body>
 
@@ -1439,6 +1440,7 @@
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="graduateddca" onchange="onBotStrategyCheck(this)"> Graduated DCA</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev5" onchange="onBotStrategyCheck(this)"> Claude.v5</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev6" onchange="onBotStrategyCheck(this)"> Claude.v6</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev7" onchange="onBotStrategyCheck(this)"> Claude.v7</label>
         </div>
         <div class="new-bot-row" id="newBotRow">
           <input type="text" id="newBotName" placeholder="New bot name…" />
@@ -1965,41 +1967,13 @@ function onPriceModeChange() {
 }
 
 /**
- * Parse a stooq.com CSV response (newest-first) into an array of closing
- * prices sorted oldest-first.
- * @param {string} csvText
- * @returns {number[]}
+ * Look up pre-bundled historical prices for a stooq symbol + year.
+ * Returns { dates: string[], prices: number[] } or null if not available.
  */
-function parseStooqCSV(csvText) {
-  const lines = csvText.trim().split('\n');
-  const prices = [];
-  // stooq returns data newest-first; iterate in reverse to get oldest-first
-  for (let i = lines.length - 1; i >= 1; i--) {
-    const parts = lines[i].split(',');
-    if (parts.length >= 5) {
-      const close = parseFloat(parts[4]);
-      if (!isNaN(close) && close > 0) prices.push(+close.toFixed(2));
-    }
-  }
-  return prices;
-}
-
-/**
- * Fetch historical daily closing prices from stooq.com for a given ticker and year.
- * @param {string} stooqSymbol  e.g. "aapl.us"
- * @param {number} year         e.g. 2023
- * @returns {Promise<number[]>} array of closing prices, oldest-first
- */
-async function fetchStooqPrices(stooqSymbol, year) {
-  const d1 = `${year}0101`;
-  const d2 = `${year}1231`;
-  const url = `https://stooq.com/q/d/l/?s=${stooqSymbol}&d1=${d1}&d2=${d2}&i=d`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`HTTP ${response.status} for ${stooqSymbol}`);
-  const csv = await response.text();
-  const prices = parseStooqCSV(csv);
-  if (prices.length < 2) throw new Error(`No data returned for ${stooqSymbol} in ${year}`);
-  return prices;
+function lookupHistoricalPrices(stooqSymbol, year) {
+  const data = window.HISTORICAL_PRICES;
+  if (!data) return null;
+  return data[stooqSymbol]?.[String(year)] ?? null;
 }
 
 // ──────────────────────────────────────────────
@@ -2073,60 +2047,51 @@ async function startSimulation() {
     iterationResults = [];
     iterationConfig = { priceMode: 'real', market, year, numStocks: selected.length };
 
-    const btn = document.getElementById('startBtn');
-    btn.disabled = true;
-    btn.textContent = 'Loading data…';
-
-    try {
-      const results = await Promise.allSettled(
-        selected.map(s => fetchStooqPrices(s.stooq, year))
-      );
-
-      // Keep only stocks whose data loaded successfully
-      const validStocks = [];
-      const validPrices = [];
-      results.forEach((r, i) => {
-        if (r.status === 'fulfilled' && r.value.length >= 2) {
-          validStocks.push(selected[i]);
-          validPrices.push(r.value);
-        }
-      });
-
-      if (validStocks.length === 0) {
-        throw new Error(
-          'No price data could be loaded. Check your internet connection and try again.'
-        );
-      }
-
-      // totalDays = last valid price index, consistent with GBM convention where
-      // generatePriceSeries(t, days) produces prices[0..days] (length = days + 1).
-      // The longest fetched series has length L, so its last valid index is L - 1.
-      const maxLen = Math.max(...validPrices.map(p => p.length));
-      totalDays = maxLen - 1;
-
-      stocks = validStocks.map((s, i) => ({
-        name:       s.name,
-        symbol:     s.symbol,
-        basePrice:  validPrices[i][0],
-        color:      CHART_COLORS[i % CHART_COLORS.length],
-        prices:     validPrices[i],
-      }));
-
-      // Pad shorter series to maxLen elements so prices[totalDays] is always valid
-      stocks.forEach(s => {
-        while (s.prices.length < maxLen) {
-          s.prices.push(s.prices[s.prices.length - 1]);
-        }
-      });
-
-      initSimulationUI();
-
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = 'Start Simulation';
-      alert('Could not load historical prices: ' + err.message +
-            '\n\nTip: stooq.com may be temporarily unavailable or your browser may be blocking cross-origin requests. Try again or switch to Simulated mode.');
+    if (!window.HISTORICAL_PRICES) {
+      alert('Historical price data is not available.\n\nRun: node scripts/fetch-prices.js\nto generate data/prices.js, then reload the page.');
+      return;
     }
+
+    // Keep only stocks that have bundled data for the chosen year
+    const validStocks = [];
+    const validPrices = [];
+    const validDates  = [];
+    selected.forEach(s => {
+      const entry = lookupHistoricalPrices(s.stooq, year);
+      if (entry && entry.prices.length >= 2) {
+        validStocks.push(s);
+        validPrices.push(entry.prices.slice());
+        validDates.push(entry.dates.slice());
+      }
+    });
+
+    if (validStocks.length === 0) {
+      alert(`No historical price data found for ${market.toUpperCase()} stocks in ${year}.\n\nRe-run scripts/fetch-prices.js to refresh data/prices.js.`);
+      return;
+    }
+
+    // totalDays = last valid price index (matches GBM convention: length = days + 1)
+    const maxLen = Math.max(...validPrices.map(p => p.length));
+    totalDays = maxLen - 1;
+
+    stocks = validStocks.map((s, i) => ({
+      name:      s.name,
+      symbol:    s.symbol,
+      basePrice: validPrices[i][0],
+      color:     CHART_COLORS[i % CHART_COLORS.length],
+      prices:    validPrices[i],
+      dates:     validDates[i],
+    }));
+
+    // Pad shorter series so prices[totalDays] is always valid
+    stocks.forEach(s => {
+      while (s.prices.length < maxLen) {
+        s.prices.push(s.prices[s.prices.length - 1]);
+        s.dates.push(s.dates[s.dates.length - 1]);
+      }
+    });
+
+    initSimulationUI();
     return;
   }
 
@@ -2494,13 +2459,18 @@ function renderChart() {
   // ── X axis labels ──
   ctx.textAlign = 'center';
   const xTickCount = Math.min(8, seriesLen);
-  const today = new Date();
+  const activeSt = stocks.find(s => s.symbol === activeStock) || stocks[0];
   for (let t = 0; t <= xTickCount; t++) {
     const idx = Math.round((t / xTickCount) * (seriesLen - 1));
     const x = xOf(idx);
-    const dt = new Date(today);
-    dt.setDate(today.getDate() + idx);
-    const label = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    let label;
+    if (activeSt?.dates?.[idx]) {
+      label = new Date(activeSt.dates[idx]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    } else {
+      const dt = new Date();
+      dt.setDate(dt.getDate() + idx);
+      label = dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    }
     ctx.fillStyle = tc.axisText;
     ctx.fillText(label, x, PAD.top + plotH + 18);
   }
@@ -2644,7 +2614,11 @@ function renderChart() {
 
     // Build multi-line tooltip
     ctx.font = '11px sans-serif';
-    const dayLabel = `Day ${ti}`;
+    const _activeSt = stocks.find(s => s.symbol === activeStock) || stocks[0];
+    const _dateStr  = _activeSt?.dates?.[ti];
+    const dayLabel  = _dateStr
+      ? new Date(_dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      : `Day ${ti}`;
     const tooltipLines = visible.map((stock, si) => {
       const prices = allPriceSeries[si];
       const stockTrades = transactions.filter(tx => tx.symbol === stock.symbol && tx.day < prices.length);
@@ -3943,6 +3917,324 @@ else if (regime === "BULL" && numPos < MAX_POS && cash >= MIN_POS * 2) {
 // BEAR REGIME: no new buys. Cash is the position.
 // Exception: if we're nearly fully invested still (stops haven't fired),
 // that means bear signal is mild — don't force sells just to raise cash.`
+,
+
+claudev7:
+`// ═══════════════════════════════════════════════════════════════════════════
+// APEX v7 — The Pragmatist
+//
+// WHAT WENT WRONG IN PREVIOUS VERSIONS
+// ──────────────────────────────────────
+// v5 and v6 used market-wide "breadth crash detectors" — if fewer than
+// 35-40% of stocks were above their 20-day MA, the bot sold losers and
+// stopped buying. The flaw: breadth signals are noisy. A brief dip in
+// breadth triggers expensive sells; then the market recovers and the bot
+// pays again to re-enter. Net result: correct in deep bear markets, wrong
+// in choppy or mildly bear markets — and the fees from false exits wipe
+// out the gains from correct ones.
+//
+// v7 abandons market-wide signals entirely.
+//
+// THE CORE INSIGHT: individual stock stops beat market timing
+// ────────────────────────────────────────────────────────────
+// A market-wide crash detector tries to predict what ALL stocks will do.
+// That's hard. An individual stop-loss only needs to predict that ONE
+// specific stock won't recover — which is much more tractable. When a
+// stock is down 22% from our average cost, it has already cost us a lot
+// AND it needs to rally 28% just to break even. The expected value of
+// cutting it and redeploying into something healthier is positive in most
+// regimes. This is the core mechanism of v7.
+//
+// THE THREE-PHASE STRUCTURE
+// ──────────────────────────
+//
+// Phase 1 — Hard stops (every day):
+//   If any position loses >22% from average cost, sell it. This is pure
+//   capital rescue. No market-wide condition required.
+//   Threshold choice: 22% is wide enough to survive normal GBM noise
+//   (~1.5% daily vol over 15 days ≈ ±5.8% at 1 SD) and real-world
+//   corrections (a 20% drawdown is the textbook "bear market" entry),
+//   while still cutting stocks that are genuinely broken.
+//
+// Phase 2 — Instant deployment (days 1–2):
+//   Get fully invested by end of day 2. This matches Buy & Hold's
+//   time-in-market advantage. On day 1 we have no price history to
+//   differentiate stocks, so we use equal allocation (same as B&H).
+//   From day 2, a light 5-day momentum tilt nudges the basket slightly
+//   toward early leaders — a zero-cost edge when it works and negligible
+//   when it doesn't.
+//
+// Phase 3 — Quarterly rotation (every 75 days, after day 30):
+//   Once per quarter, scan held positions for genuine medium-term
+//   underperformers: any stock down ≥10% over the last 30 days.
+//   Rotate those into the best available unowned stock, provided:
+//     (a) the replacement is above its 20-day MA (no falling knives), AND
+//     (b) the replacement outperforms the loser by ≥15% over 30 days
+//         (the gap must justify the $10 in trading fees).
+//   Maximum 2 rotations per event ($20 in fees, well justified if the
+//   spread is 15%+ per position).
+//
+// Phase 4 — Slot fill (every day after deployment):
+//   If a hard stop or rotation leaves a slot empty and the quarterly
+//   event hasn't filled it, find the best available stock passing:
+//     - Above 20-day MA (uptrend quality filter)
+//     - 10-day momentum > -3% (not in active freefall)
+//   This uses a wider acceptance bar than Phase 3 (no gap requirement)
+//   because we're just filling a slot, not doing a discretionary rotation.
+//
+// WHY THIS BEATS THE FIELD
+// ─────────────────────────
+// vs Buy & Hold:
+//   B&H holds everything regardless of individual stock behaviour. In any
+//   market where one or more stocks decline >22% and DON'T recover in the
+//   simulation window, v7 wins by cutting them early and redeploying into
+//   better alternatives. In a strong bull market where everything rises,
+//   v7 ≈ B&H (stops rarely fire, fees are minimal). The asymmetry favours
+//   v7: downside protection with minimal upside sacrifice.
+//
+// vs SMA / RSI / Momentum / Mean Reversion:
+//   All of those bots have CASH DRAG — they wait for signals before
+//   deploying. In the most common scenario (markets go up over time),
+//   sitting in cash waiting for a "buy signal" is expensive. v7 is fully
+//   invested from day 2 and only exits on hard evidence (an individual
+//   stock actually losing 22%).
+//
+// vs Graduated DCA:
+//   DCA ADDS to losers. If a stock keeps declining (sustained bear),
+//   DCA accumulates more of the loser. v7 cuts it. In trending bear
+//   markets (2022, dot-com bust), cutting beats averaging. In V-shaped
+//   recoveries (COVID 2020), DCA wins because it bought the dip. The two
+//   approaches have symmetric strengths — v7 outperforms in sustained
+//   trends, DCA outperforms in sharp reversals.
+//
+// vs APEX v5 / v6:
+//   Those bots had correct intuition but faulty execution: market-wide
+//   breadth signals are too noisy to trade on at $5/trade. v7 removes
+//   all market-wide signals and focuses purely on individual stock merit.
+//
+// WHAT v7 DOES NOT DO (intentionally)
+// ─────────────────────────────────────
+// - No look-ahead: all signals use only priceHistory() data available
+//   at the time of the decision. No knowledge of future prices.
+// - No data-specific tuning: thresholds are derived from general
+//   principles (bear market definition, fee break-even math), not fitted
+//   to any particular historical dataset or GBM run.
+// - No market-timing: v7 never goes "all cash" based on a macro signal.
+//   The only way to accumulate cash is via individual stock stops.
+//
+// PARAMETERS
+// ───────────
+// MAX_POSITIONS = 8   : broad diversification, 8 stocks = ~12.5% each
+// HARD_STOP     = 22% : textbook bear threshold; recovery math unfavourable past this
+// DEPLOY_DAYS   = 2   : fully invested by day 2
+// REBAL_EVERY   = 75  : quarterly rotation (~4x/year)
+// MAX_ROTATIONS = 2   : ≤$20/quarter in fees for rotation
+// ROT_LOSS_MIN  = 10% : 30-day loss threshold before considering rotation
+// ROT_GAP_MIN   = 15% : min performance gap needed to justify $10 in fees
+// MIN_ALLOC     = 300 : minimum $ per position (avoids fractional ghost positions)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const MAX_POSITIONS = 8;
+const HARD_STOP     = 0.22;
+const DEPLOY_DAYS   = 2;
+const REBAL_EVERY   = 75;
+const MAX_ROTATIONS = 2;
+const ROT_LOSS_MIN  = 0.10;
+const ROT_GAP_MIN   = 0.15;
+const MIN_ALLOC     = 300;
+
+// The bot API gives snapshots of \`holdings\` and \`cash\` at the START of
+// this day. Calls to buy() and sell() update the live portfolio but do NOT
+// update these local variables. We maintain our own tracking variables so
+// we can make accurate decisions mid-tick without overspending or
+// accidentally buying into a slot we already filled.
+let availCash = cash;
+const soldSet   = new Set(); // symbols sold this tick (hard stops + rotations)
+const boughtSet = new Set(); // symbols bought this tick
+
+// ── Helper: N-day realized volatility (std dev of daily returns) ──────────
+// Returns a fraction (e.g. 0.015 = 1.5%/day). Defaults to 0.02 when
+// history is too short — a reasonable prior for a typical equity.
+function getVol(sym, n) {
+  const h = priceHistory(sym, n + 1);
+  if (h.length < 4) return 0.02;
+  let ss = 0;
+  for (let i = 1; i < h.length; i++) {
+    const r = (h[i] - h[i-1]) / h[i-1];
+    ss += r * r;
+  }
+  return Math.sqrt(ss / (h.length - 1));
+}
+
+// ── Helper: N-day price momentum (simple return) ──────────────────────────
+// Returns 0 when history is too short (conservative default).
+function getMom(sym, n) {
+  const h = priceHistory(sym, n + 1);
+  if (h.length < 2) return 0;
+  return (h[h.length-1] - h[0]) / Math.max(h[0], 0.001);
+}
+
+// ── Helper: is this stock in an uptrend? ─────────────────────────────────
+// True if price ≥ 98% of its period-day MA. The 2% tolerance prevents
+// false negatives from intraday noise right at the MA level.
+// Returns true by default when history is too short to compute the MA.
+function aboveMA(sym, period) {
+  const h = priceHistory(sym, period + 1);
+  if (h.length < period) return true;
+  const ma = h.slice(-period).reduce((a, b) => a + b, 0) / period;
+  return prices[sym] >= ma * 0.98;
+}
+
+// ── Portfolio state (all values are start-of-day snapshots) ───────────────
+const portValue = availCash + Object.entries(holdings).reduce(
+  (s, [sym, h]) => s + (prices[sym] ?? 0) * h.shares, 0
+);
+const allSyms  = Object.keys(prices);
+const heldSyms = Object.keys(holdings);
+
+// Accurate live position count: snapshot positions, minus what we sold
+// this tick, plus what we bought this tick.
+function posCount() {
+  return heldSyms.filter(s => !soldSet.has(s)).length + boughtSet.size;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 1 — HARD STOPS: fires every day before any other logic
+// ════════════════════════════════════════════════════════════════════════════
+
+for (const [sym, pos] of Object.entries(holdings)) {
+  const pnl = (prices[sym] - pos.avgCost) / pos.avgCost;
+  if (pnl <= -HARD_STOP) {
+    sell(sym, pos.shares);
+    soldSet.add(sym);
+    // Approximate cash recovered (slightly over-estimates by ignoring the
+    // $5 trading cost, but close enough for subsequent allocation math).
+    availCash += pos.shares * prices[sym];
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 2 — INSTANT DEPLOYMENT: days 1 and 2 only
+// ════════════════════════════════════════════════════════════════════════════
+
+if (day <= DEPLOY_DAYS) {
+  const need = MAX_POSITIONS - posCount();
+  if (need > 0) {
+    // Momentum window: max(day-1, 1) so we get at least 1-day return from
+    // day 2 onward. On day 1 getMom returns 0 for all stocks (no prior
+    // close yet), so day-1 deployment is effectively equal-weight — which
+    // is the correct choice when no information is available.
+    const momN = Math.max(day - 1, 1);
+
+    const candidates = allSyms
+      .filter(s => !holdings[s] && !boughtSet.has(s))
+      .map(s => ({ s, mom: getMom(s, momN) }))
+      .sort((a, b) => b.mom - a.mom) // highest momentum first
+      .slice(0, need)
+      .map(c => c.s);
+
+    for (const sym of candidates) {
+      if (posCount() >= MAX_POSITIONS) break;
+      // Allocate portValue / MAX_POSITIONS per stock (equal weight on
+      // initial entry). We don't use inv-vol sizing here because with
+      // <2 days of history the volatility estimate would be unreliable
+      // and equal-weight IS the correct uninformed prior.
+      const alloc = Math.min(portValue / MAX_POSITIONS, availCash * 0.95);
+      if (alloc < MIN_ALLOC) continue;
+      const shares = Math.floor(alloc / prices[sym]);
+      if (shares > 0) {
+        buy(sym, shares);
+        boughtSet.add(sym);
+        availCash -= alloc;
+      }
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 3 — QUARTERLY ROTATION: fires every REBAL_EVERY days (after day 30)
+// ════════════════════════════════════════════════════════════════════════════
+
+else if (day > 30 && day % REBAL_EVERY === 0) {
+  // Score held positions by their 30-day return, worst first.
+  // We skip anything already sold by Phase 1 this tick.
+  const holdingPerf = heldSyms
+    .filter(s => !soldSet.has(s))
+    .map(s => ({ s, ret: getMom(s, 30) }))
+    .sort((a, b) => a.ret - b.ret); // ascending: worst at index 0
+
+  // Score unowned stocks as rotation candidates.
+  // Requirements: currently above MA20 (uptrend) AND positive 30-day return.
+  const bench = allSyms
+    .filter(s => !holdings[s] && !boughtSet.has(s))
+    .map(s => ({ s, ret: getMom(s, 30) }))
+    .filter(c => c.ret > 0 && aboveMA(c.s, 20))
+    .sort((a, b) => b.ret - a.ret); // descending: best at index 0
+
+  let rotations = 0;
+  for (const { s: loser, ret: loserRet } of holdingPerf) {
+    if (rotations >= MAX_ROTATIONS) break;
+    // Only rotate if this position has genuinely underperformed over 30 days.
+    // Small losses (<10%) are noise and don't justify $10 in fees.
+    if (loserRet >= -ROT_LOSS_MIN) break;
+
+    // Find the best bench stock that outperforms the loser by the required gap.
+    // The gap (15%) must clear the $10 round-trip fee on a typical allocation
+    // (~$1,250 per position on a $10K portfolio → 15% of $1,250 = $187 >> $10).
+    const repl = bench.find(b =>
+      !boughtSet.has(b.s) && (b.ret - loserRet) >= ROT_GAP_MIN
+    );
+    if (!repl) continue;
+
+    // Execute the rotation: sell loser, buy replacement.
+    const pos = holdings[loser];
+    sell(loser, pos.shares);
+    soldSet.add(loser);
+    availCash += pos.shares * prices[loser];
+
+    const alloc = Math.min(portValue / MAX_POSITIONS, availCash * 0.90);
+    if (alloc >= MIN_ALLOC) {
+      const shares = Math.floor(alloc / prices[repl.s]);
+      if (shares > 0) {
+        buy(repl.s, shares);
+        boughtSet.add(repl.s);
+        availCash -= alloc;
+        rotations++;
+        bench.splice(bench.indexOf(repl), 1); // remove from candidates pool
+      }
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// PHASE 4 — FILL EMPTY SLOTS: any day after deployment
+// ════════════════════════════════════════════════════════════════════════════
+// Triggered when Phase 1 (stops) or Phase 3 (rotation) left an empty slot
+// that still needs filling. Uses a wider acceptance bar than Phase 3
+// (no ROT_GAP_MIN) because we're filling dead capital, not doing a
+// discretionary swap. The MA20 filter and momentum floor are still applied
+// to avoid re-investing into stocks that are actively falling.
+
+if (day > DEPLOY_DAYS && posCount() < MAX_POSITIONS && availCash >= MIN_ALLOC * 2) {
+  const eligible = allSyms
+    .filter(s => !holdings[s] && !soldSet.has(s) && !boughtSet.has(s))
+    .filter(s => aboveMA(s, 20))          // quality gate: must be in uptrend
+    .map(s => ({ s, mom: getMom(s, 10) }))
+    .filter(c => c.mom > -0.03)           // exclude stocks in clear freefall
+    .sort((a, b) => b.mom - a.mom);
+
+  for (const { s: sym } of eligible) {
+    if (posCount() >= MAX_POSITIONS) break;
+    const alloc = Math.min(portValue / MAX_POSITIONS, availCash * 0.95);
+    if (alloc < MIN_ALLOC) break;
+    const shares = Math.floor(alloc / prices[sym]);
+    if (shares > 0) {
+      buy(sym, shares);
+      boughtSet.add(sym);
+      availCash -= alloc;
+    }
+  }
+}`
 };
 
 const DEFAULT_BOT_SCRIPT = BOT_SCRIPTS.sma;
