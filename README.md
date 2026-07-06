@@ -7,7 +7,7 @@ A browser-based stock market simulator that lets you practise trading strategies
 ## Features
 
 - **Realistic price generation** – Stock prices are modelled using Geometric Brownian Motion (GBM), the same stochastic process used in the Black–Scholes model.
-- **Real Historical Prices** – Switch to **Real Historical Prices** mode to replay actual daily closing prices for well-known US or UK companies. Data is fetched live from [stooq.com](https://stooq.com) (internet access required). Choose from 15 US stocks (NYSE/NASDAQ) or 10 UK stocks (LSE) and select any year from 2020 to 2024 (default: 2023). The chart x-axis shows real calendar dates.
+- **Real Historical Prices** – Switch to **Real Historical Prices** mode to replay actual daily closing prices for well-known US or UK companies. Data is fetched live from [stooq.com](https://stooq.com) (internet access required). Choose from 15 US stocks (NYSE/NASDAQ) or 10 UK stocks (LSE) and select any year from 2020 to 2025 (default: 2023). The chart x-axis shows real calendar dates.
 - **Multiple market conditions** – Choose between a normal market, a bull market (upward drift), a bear market (downward drift), or a high-volatility market.
 - **Configurable simulation** – Set the number of stocks (3, 5, or 8), starting capital, trading cost (flat fee per order), and simulation period (30 days to 5 years).
 - **Interactive chart** – Canvas-based price chart with per-stock colour-coding, hover tooltips showing exact prices, and buy/sell trade markers (▲/▼).
@@ -47,7 +47,7 @@ Or simply double-click `index.html` in your file manager.
 
 ## Usage
 
-1. **Configure** – Set your starting capital, number of stocks, simulation period, trading cost, and market condition in the settings panel. To use real historical data, select **Real Historical Prices** in the **Price Data** field, then choose a market (US or UK) and a year (2020–2024).
+1. **Configure** – Set your starting capital, number of stocks, simulation period, trading cost, and market condition in the settings panel. To use real historical data, select **Real Historical Prices** in the **Price Data** field, then choose a market (US or UK) and a year (2020–2025).
 2. **Start** – Click **▶ Play** to run the simulation continuously, or **Step →** to advance one day at a time.
 3. **Trade** – Use the trade form to buy or sell shares manually at any time.
 4. **Automate** – In the **Simulation Setup** screen, enable the Auto-Trading Bot, select one or more preset strategies (multi-select) or write your own JavaScript, and let it trade for you.

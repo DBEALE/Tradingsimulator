@@ -1409,6 +1409,7 @@
           <option value="2022">2022</option>
           <option value="2023" selected>2023</option>
           <option value="2024">2024</option>
+          <option value="2025">2025</option>
         </select>
       </div>
       <div class="field">
@@ -1441,6 +1442,7 @@
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev5" onchange="onBotStrategyCheck(this)"> Claude.v5</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev6" onchange="onBotStrategyCheck(this)"> Claude.v6</label>
           <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="claudev7" onchange="onBotStrategyCheck(this)"> Claude.v7</label>
+          <label class="bot-strategy-item"><input type="checkbox" name="botStrategy" value="opusv48" onchange="onBotStrategyCheck(this)"> Opusv4.8</label>
         </div>
         <div class="new-bot-row" id="newBotRow">
           <input type="text" id="newBotName" placeholder="New bot name…" />
@@ -1612,7 +1614,7 @@
           <tr><td><strong>Price Data</strong></td><td><em>Simulated (GBM)</em> generates random prices using Geometric Brownian Motion. <em>Real Historical Prices</em> fetches actual daily closing prices from stooq.com — internet access required.</td></tr>
           <tr><td><strong>Simulation Period</strong></td><td>Number of trading days to simulate (30 days – 5 years). Hidden in Real Historical mode (the full calendar year is used instead).</td></tr>
           <tr><td><strong>Market Condition</strong></td><td>Sets the overall trend: Bull (up), Neutral (random), Bear (down), High Volatility, Dot-com Boom &amp; Bust, 2008 Financial Crisis, or COVID Crash &amp; Recovery. Hidden in Real Historical mode.</td></tr>
-          <tr><td><strong>Market / Historical Year</strong></td><td>Visible in Real Historical mode. Choose <em>US Stocks</em> (NYSE/NASDAQ, up to 15 companies) or <em>UK Stocks</em> (LSE, up to 10 companies) and the calendar year to replay (2020–2024, default 2023).</td></tr>
+          <tr><td><strong>Market / Historical Year</strong></td><td>Visible in Real Historical mode. Choose <em>US Stocks</em> (NYSE/NASDAQ, up to 15 companies) or <em>UK Stocks</em> (LSE, up to 10 companies) and the calendar year to replay (2020–2025, default 2023).</td></tr>
           <tr><td><strong>Number of Stocks</strong></td><td>How many stocks to include (1, 5, 10, 25, or 100). In Real Historical mode the pool is capped at the number of available real companies.</td></tr>
           <tr><td><strong>Trading Cost</strong></td><td>Flat fee deducted from each buy or sell order (default $5.00).</td></tr>
           <tr><td><strong>Bot Strategies</strong></td><td>Check one or more strategies to include in the simulation. Checking a strategy loads its script into the editor. You can also write and save a custom bot.</td></tr>
@@ -4246,6 +4248,141 @@ if (day > DEPLOY_DAYS && posCount() < effectiveMax && availCash >= MIN_ALLOC * 2
       buy(sym, shares);
       boughtSet.add(sym);
       availCash -= alloc;
+    }
+  }
+}`
+,
+
+opusv48:
+`// ═══════════════════════════════════════════════════════════════════
+// Opus v4.8 — Adaptive Trend Rider
+//
+// A trend-following strategy built to generalise across BOTH synthetic
+// (GBM) and real historical data, with no dataset-specific tuning.
+//
+// Every rule is deliberately SCALE-FREE and VOLATILITY-RELATIVE, so the
+// same constants behave sensibly whether a price is $50 or 13,000p and
+// whether daily volatility is 1% or 4%.
+//
+//   1. STAY INVESTED. Markets spend most of their time rising and the
+//      per-trade fee punishes hesitation, so we deploy fully by day 3.
+//      Cash is only ever raised by stopping out an INDIVIDUAL position —
+//      never on a market-wide "get out" signal (those are too noisy to
+//      trade profitably at these fees; see the Claude.v5/v6 notes).
+//
+//   2. VOLATILITY-SCALED TRAILING STOP (the core edge). We exit when a
+//      stock falls K × (its OWN recent daily volatility) below its recent
+//      high — a "chandelier" exit. Expressed in units of each stock's own
+//      volatility, it self-calibrates across any price scale or regime.
+//      This is the single rule that lets the bot port from GBM to the
+//      FTSE/S&P unchanged. Anchoring the 'high' at no less than our entry
+//      cost means the same rule doubles as the initial stop after a buy.
+//
+//   3. RISK-PARITY-LITE SIZING. Position weight scales with 1/volatility
+//      (clamped), so calmer stocks get larger weights and one wild name
+//      cannot dominate portfolio risk — lower drawdowns, no forecasting.
+//
+// Winners are never sold at a fixed profit target: the trailing stop lets
+// them run (trend-following's whole advantage) and only cuts them once
+// they give back a volatility-appropriate amount from their peak.
+//
+// No look-ahead: every signal uses only priceHistory() up to 'today'.
+// ═══════════════════════════════════════════════════════════════════
+
+var MAX_POSITIONS = 8;      // broad diversification
+var DEPLOY_BY     = 3;      // fully invested by day 3 (minimise cash drag)
+var MIN_ALLOC     = 300;    // skip trades too small to matter after fees
+var STOP_K        = 5;      // stop = K × dailyVol below the recent high
+var STOP_FLOOR    = 0.08;   // never tighter than 8%
+var STOP_CEIL     = 0.30;   // never wider than 30%
+var VOL_LOOKBACK  = 20;     // window for the volatility estimate
+var HIGH_LOOKBACK = 20;     // window for the trailing 'recent high'
+var TARGET_VOL    = 0.02;   // anchor: a 2%/day stock gets the base weight
+var BASE_WEIGHT   = 0.14;   // base position size at TARGET_VOL
+var WEIGHT_FLOOR  = 0.06;
+var WEIGHT_CEIL   = 0.18;
+
+// ── helpers ────────────────────────────────────────────────────────
+function mean(a) { var s = 0; for (var i = 0; i < a.length; i++) s += a[i]; return s / a.length; }
+function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+
+// Daily return volatility (std dev), as a fraction. Neutral prior when
+// there isn't enough history yet.
+function dailyVol(sym) {
+  var h = priceHistory(sym, VOL_LOOKBACK + 1);
+  if (h.length < 4) return TARGET_VOL;
+  var r = [];
+  for (var i = 1; i < h.length; i++) r.push((h[i] - h[i - 1]) / h[i - 1]);
+  var m = mean(r), v = 0;
+  for (var j = 0; j < r.length; j++) v += (r[j] - m) * (r[j] - m);
+  return Math.max(0.005, Math.sqrt(v / r.length));
+}
+
+function movingAvg(sym, n) { var h = priceHistory(sym, n); return h.length ? mean(h) : null; }
+
+function momentum(sym, n) {
+  var h = priceHistory(sym, n + 1);
+  if (h.length < 2) return 0;
+  return (h[h.length - 1] - h[0]) / h[0];
+}
+
+// buy()/sell() do NOT update the 'holdings'/'cash' snapshots, so we track
+// spendable cash and names touched THIS tick ourselves.
+var availCash = cash;
+var sold = {}, bought = {};
+
+var portValue = availCash;
+for (var sym in holdings) portValue += (prices[sym] || 0) * holdings[sym].shares;
+
+// ── EXITS: volatility-scaled trailing stop ─────────────────────────
+for (var sym in holdings) {
+  var pos = holdings[sym];
+  var price = prices[sym];
+  if (price == null) continue;
+
+  var hist = priceHistory(sym, HIGH_LOOKBACK);
+  var high = pos.avgCost;                       // floor the 'high' at entry cost
+  for (var k = 0; k < hist.length; k++) if (hist[k] > high) high = hist[k];
+
+  var stopDist = clamp(STOP_K * dailyVol(sym), STOP_FLOOR, STOP_CEIL);
+  if ((high - price) / high > stopDist) {
+    sell(sym, pos.shares);
+    sold[sym] = true;
+    availCash += price * pos.shares;
+  }
+}
+
+// positions still held after exits
+var count = 0;
+for (var s in holdings) if (!sold[s]) count++;
+
+// ── ENTRIES: fill up to MAX_POSITIONS with trending names ──────────
+if (count < MAX_POSITIONS) {
+  var early = day <= DEPLOY_BY;                 // little history early → buy broadly
+  var cands = [];
+  for (var sym in prices) {
+    if (holdings[sym] || sold[sym] || bought[sym]) continue;
+    var price = prices[sym];
+    if (price == null || price <= 0) continue;
+    var m20 = movingAvg(sym, 20);
+    var uptrend = (m20 == null) ? true : price > m20 * 0.98;
+    if (!early && !uptrend) continue;           // later: only buy uptrends
+    cands.push({ sym: sym, price: price, mom: momentum(sym, 10), vol: dailyVol(sym) });
+  }
+  cands.sort(function (a, b) { return b.mom - a.mom; });   // strongest momentum first
+
+  for (var c = 0; c < cands.length; c++) {
+    if (count >= MAX_POSITIONS) break;
+    var cand = cands[c];
+    var weight = clamp(BASE_WEIGHT * (TARGET_VOL / cand.vol), WEIGHT_FLOOR, WEIGHT_CEIL);
+    var alloc = Math.min(portValue * weight, availCash * 0.95);
+    if (alloc < MIN_ALLOC) continue;
+    var shares = Math.floor(alloc / cand.price);
+    if (shares > 0) {
+      buy(cand.sym, shares);
+      bought[cand.sym] = true;
+      availCash -= shares * cand.price;
+      count++;
     }
   }
 }`
