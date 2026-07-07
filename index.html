@@ -1732,6 +1732,7 @@ let totalDays = 365;
 let startingCapital = 10000;
 let cash = 10000;
 let tradingCost = 5.0;   // flat fee per order
+let CURRENCY = '$';  // display currency symbol; '£' for UK historical, '$' otherwise
 let holdings = {};   // { symbol: { shares: number, totalCost: number } }
 let transactions = [];
 let playInterval = null;
@@ -2033,6 +2034,8 @@ function initSimulationUI() {
 
 async function startSimulation() {
   const priceMode = document.getElementById('priceMode').value;
+  // UK historical prices are in pounds; everything else is treated as dollars.
+  CURRENCY = (priceMode === 'real' && document.getElementById('realMarket').value === 'uk') ? '£' : '$';
   startingCapital = parseFloat(document.getElementById('startCapital').value) || 10000;
   tradingCost = parseFloat(document.getElementById('tradingCostInput').value) || 0;
 
@@ -2466,7 +2469,7 @@ function renderChart() {
     ctx.moveTo(PAD.left, y);
     ctx.lineTo(PAD.left + plotW, y);
     ctx.stroke();
-    ctx.fillText('$' + v.toFixed(2), PAD.left - 6, y + 3);
+    ctx.fillText(CURRENCY + v.toFixed(2), PAD.left - 6, y + 3);
   }
 
   // ── X axis labels ──
@@ -2639,7 +2642,7 @@ function renderChart() {
       const dayTrades = stockTrades.filter(t => t.day === ti)
         .map(t => ({ ...t, marker: t.type === 'buy' ? '▲' : '▼', suffix: '' }))
         .concat(compareTrades.filter(t => t.day === ti).map(t => ({ ...t, marker: t.type === 'buy' ? '▲' : '▼', suffix: ` [${t.botName}]` })));
-      let text = `${stock.symbol}: $${prices[ti].toFixed(2)}`;
+      let text = `${stock.symbol}: ${CURRENCY}${prices[ti].toFixed(2)}`;
       if (dayTrades.length > 0) {
         text += '  ' + dayTrades.map(t => `${t.marker} ${t.shares}×${t.suffix}`).join(', ');
       }
@@ -2724,9 +2727,9 @@ function renderBotPnlChart() {
   ctx.fillStyle = tc.axisText;
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(`$${hi.toFixed(0)}`, PAD.left - 6, PAD.top + 3);
-  ctx.fillText('$0', PAD.left - 6, yOf(0) + 3);
-  ctx.fillText(`$${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
+  ctx.fillText(`${CURRENCY}${hi.toFixed(0)}`, PAD.left - 6, PAD.top + 3);
+  ctx.fillText(`${CURRENCY}0`, PAD.left - 6, yOf(0) + 3);
+  ctx.fillText(`${CURRENCY}${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
 
   botComparisonData.forEach(bot => {
     const color = bot.color;
@@ -2787,9 +2790,9 @@ function renderCompletionBotPnlChart() {
   ctx.fillStyle = tc.axisText;
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
-  ctx.fillText(`$${hi.toFixed(0)}`, PAD.left - 6, PAD.top + 3);
-  ctx.fillText('$0', PAD.left - 6, yOf(0) + 3);
-  ctx.fillText(`$${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
+  ctx.fillText(`${CURRENCY}${hi.toFixed(0)}`, PAD.left - 6, PAD.top + 3);
+  ctx.fillText(`${CURRENCY}0`, PAD.left - 6, yOf(0) + 3);
+  ctx.fillText(`${CURRENCY}${lo.toFixed(0)}`, PAD.left - 6, PAD.top + plotH + 3);
 
   botComparisonData.forEach(bot => {
     const color = bot.color;
@@ -2880,7 +2883,7 @@ function updatePriceHeader() {
   const change = price - prev;
   const changePct = prev !== 0 ? (change / prev) * 100 : 0;
 
-  document.getElementById('currentPrice').textContent = `$${price.toFixed(2)}`;
+  document.getElementById('currentPrice').textContent = `${CURRENCY}${price.toFixed(2)}`;
   const changeEl = document.getElementById('priceChange');
   changeEl.textContent = `${change >= 0 ? '+' : ''}${change.toFixed(2)} (${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%)`;
   changeEl.className = 'price-change ' + (change >= 0 ? 'up' : 'down');
@@ -2889,7 +2892,7 @@ function updatePriceHeader() {
   const totalChange = price - startPrice;
   const totalPct = ((totalChange / startPrice) * 100).toFixed(2);
   document.getElementById('priceMeta').textContent =
-    `${stock.name} · Day ${currentDay} · Start: $${startPrice.toFixed(2)} · Total: ${totalChange >= 0 ? '+' : ''}${totalPct}%`;
+    `${stock.name} · Day ${currentDay} · Start: ${CURRENCY}${startPrice.toFixed(2)} · Total: ${totalChange >= 0 ? '+' : ''}${totalPct}%`;
 }
 
 // ──────────────────────────────────────────────
@@ -2931,11 +2934,11 @@ function updateMarketTable() {
     row.innerHTML = `
       <td style="font-weight:600; cursor:pointer; color:${s.color}" onclick="setActiveStock('${s.symbol}')">${s.symbol}</td>
       <td><canvas class="table-thumbnail" aria-label="Price trend sparkline"></canvas></td>
-      <td>$${price.toFixed(2)}</td>
+      <td>${CURRENCY}${price.toFixed(2)}</td>
       <td style="color:${color}">${change >= 0 ? '+' : ''}${change.toFixed(2)}</td>
       <td style="color:${color}">${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%</td>
-      <td>$${high.toFixed(2)}</td>
-      <td>$${low.toFixed(2)}</td>
+      <td>${CURRENCY}${high.toFixed(2)}</td>
+      <td>${CURRENCY}${low.toFixed(2)}</td>
       <td style="color:${totalColor}">${totalChange >= 0 ? '+' : ''}${totalChange.toFixed(2)}</td>
       <td style="color:${totalColor}">${totalChangePct >= 0 ? '+' : ''}${totalChangePct.toFixed(2)}%</td>
     `;
@@ -2961,12 +2964,12 @@ function updateMarketTable() {
     summaryRow.innerHTML =
       `<td>Market Summary</td>` +
       `<td><canvas class="table-thumbnail" aria-label="Market summary sparkline"></canvas></td>` +
-      `<td>$${sumCurrentPrices.toFixed(2)}</td>` +
+      `<td>${CURRENCY}${sumCurrentPrices.toFixed(2)}</td>` +
       `<td style="color:${dailyColor}">${sumDailyChange >= 0 ? '+' : ''}${sumDailyChange.toFixed(2)}</td>` +
       `<td style="color:${dailyColor}">${dailyChangePct >= 0 ? '+' : ''}${dailyChangePct.toFixed(2)}%</td>` +
-      `<td>$${sumHigh.toFixed(2)}</td>` +
-      `<td>$${sumLow.toFixed(2)}</td>` +
-      `<td style="color:${summaryColor}">${sumTotalChange >= 0 ? '+' : '-'}$${Math.abs(sumTotalChange).toFixed(2)}</td>` +
+      `<td>${CURRENCY}${sumHigh.toFixed(2)}</td>` +
+      `<td>${CURRENCY}${sumLow.toFixed(2)}</td>` +
+      `<td style="color:${summaryColor}">${sumTotalChange >= 0 ? '+' : '-'}${CURRENCY}${Math.abs(sumTotalChange).toFixed(2)}</td>` +
       `<td style="color:${summaryColor}">${totalPct >= 0 ? '+' : ''}${totalPct.toFixed(2)}%</td>`;
     tfoot.appendChild(summaryRow);
 
@@ -3004,12 +3007,12 @@ function updateBotPnlTable() {
     row.innerHTML =
       `<td style="font-weight:600"><span class="bot-color-dot" style="background:${bot.color};margin-right:6px"></span>${escapeHtml(bot.name)}</td>` +
       `<td><canvas class="table-thumbnail" aria-label="P&amp;L trend sparkline"></canvas></td>` +
-      `<td>$${bot.cash.toFixed(2)}</td>` +
-      `<td>$${bot.holdingsVal.toFixed(2)}</td>` +
-      `<td>$${bot.total.toFixed(2)}</td>` +
-      `<td style="color:${pnlColor}">${pnlSign}$${Math.abs(bot.pnl).toFixed(2)}</td>` +
+      `<td>${CURRENCY}${bot.cash.toFixed(2)}</td>` +
+      `<td>${CURRENCY}${bot.holdingsVal.toFixed(2)}</td>` +
+      `<td>${CURRENCY}${bot.total.toFixed(2)}</td>` +
+      `<td style="color:${pnlColor}">${pnlSign}${CURRENCY}${Math.abs(bot.pnl).toFixed(2)}</td>` +
       `<td style="color:${pnlColor}">${retSign}${Math.abs(returnPct).toFixed(2)}%</td>` +
-      `<td>$${(bot.tradingCosts || 0).toFixed(2)}</td>` +
+      `<td>${CURRENCY}${(bot.tradingCosts || 0).toFixed(2)}</td>` +
       `<td>${bot.transactions.length}</td>`;
     tbody.appendChild(row);
     const sparklineCanvas = row.querySelector('.table-thumbnail');
@@ -3055,8 +3058,8 @@ function updateBlotter() {
       `<td style="color:${tx.botColor};font-weight:600">${tx.type.toUpperCase()}</td>` +
       `<td>${escapeHtml(tx.symbol)}</td>` +
       `<td>${tx.shares}</td>` +
-      `<td>$${tx.price.toFixed(2)}</td>` +
-      `<td>$${Math.abs(tx.total).toFixed(2)}</td>`;
+      `<td>${CURRENCY}${tx.price.toFixed(2)}</td>` +
+      `<td>${CURRENCY}${Math.abs(tx.total).toFixed(2)}</td>`;
     tbody.appendChild(row);
   });
 }
@@ -3229,7 +3232,7 @@ function showCompletionModal() {
   }
 
   // All iterations done — populate and show modal
-  document.getElementById('cmStartCapital').textContent = '$' + startingCapital.toFixed(2);
+  document.getElementById('cmStartCapital').textContent = CURRENCY + startingCapital.toFixed(2);
   document.getElementById('cmSimDays').textContent = String(totalDays);
 
   // refreshBotComparisonData() was already called above; renderBotComparison() depends on it.
@@ -3362,7 +3365,7 @@ function renderIterationSummary() {
     const bestColor = '#22c55e';
     const worstColor = worstPnl >= 0 ? '#22c55e' : '#ef4444';
 
-    const formatPnl = (v) => (v >= 0 ? '+' : '-') + '$' + Math.abs(v).toFixed(2);
+    const formatPnl = (v) => (v >= 0 ? '+' : '-') + CURRENCY + Math.abs(v).toFixed(2);
 
     const row = document.createElement('tr');
     row.innerHTML =
@@ -4609,12 +4612,12 @@ function renderBotComparison() {
     row.innerHTML =
       `<td style="font-weight:600"><span class="bot-color-dot" style="background:${bot.color};margin-right:6px"></span>${escapeHtml(bot.name)}</td>` +
       `<td><canvas class="table-thumbnail cm-bot-thumbnail"></canvas></td>` +
-      `<td>$${bot.cash.toFixed(2)}</td>` +
-      `<td>$${bot.holdingsVal.toFixed(2)}</td>` +
-      `<td>$${bot.total.toFixed(2)}</td>` +
-      `<td style="color:${pnlColor}">${pnlSign}$${Math.abs(bot.pnl).toFixed(2)}</td>` +
+      `<td>${CURRENCY}${bot.cash.toFixed(2)}</td>` +
+      `<td>${CURRENCY}${bot.holdingsVal.toFixed(2)}</td>` +
+      `<td>${CURRENCY}${bot.total.toFixed(2)}</td>` +
+      `<td style="color:${pnlColor}">${pnlSign}${CURRENCY}${Math.abs(bot.pnl).toFixed(2)}</td>` +
       `<td style="color:${pnlColor}">${retSign}${Math.abs(returnPct).toFixed(2)}%</td>` +
-      `<td>$${(bot.tradingCosts || 0).toFixed(2)}</td>` +
+      `<td>${CURRENCY}${(bot.tradingCosts || 0).toFixed(2)}</td>` +
       `<td>${bot.transactions.length}</td>`;
     tbody.appendChild(row);
     const thumbCanvas = row.querySelector('.cm-bot-thumbnail');
@@ -4665,7 +4668,7 @@ function runTradingScript() {
     const price = stock.prices[currentDay];
     const cost = shares * price + tradingCost;
     if (cost > cash) {
-      appendBotLog(`Insufficient funds for ${symbol} (need $${cost.toFixed(2)}, have $${cash.toFixed(2)})`);
+      appendBotLog(`Insufficient funds for ${symbol} (need ${CURRENCY}${cost.toFixed(2)}, have ${CURRENCY}${cash.toFixed(2)})`);
       return;
     }
     cash -= cost;
@@ -4673,7 +4676,7 @@ function runTradingScript() {
     holdings[symbol].shares += shares;
     holdings[symbol].totalCost += cost;
     transactions.unshift({ type: 'buy', symbol, shares, price, total: cost, day: currentDay });
-    appendBotLog(`🤖 BUY  ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
+    appendBotLog(`🤖 BUY  ${shares}× ${symbol} @ ${CURRENCY}${price.toFixed(2)}${tradingCost > 0 ? ` (fee ${CURRENCY}${tradingCost.toFixed(2)})` : ''}`);
   };
 
   // sell(symbol, shares) — execute a market sell at today's price
@@ -4694,7 +4697,7 @@ function runTradingScript() {
     holdings[symbol].totalCost *= (1 - ratio);
     if (holdings[symbol].shares === 0) delete holdings[symbol];
     transactions.unshift({ type: 'sell', symbol, shares, price, total: proceeds, day: currentDay });
-    appendBotLog(`🤖 SELL ${shares}× ${symbol} @ $${price.toFixed(2)}${tradingCost > 0 ? ` (fee $${tradingCost.toFixed(2)})` : ''}`);
+    appendBotLog(`🤖 SELL ${shares}× ${symbol} @ ${CURRENCY}${price.toFixed(2)}${tradingCost > 0 ? ` (fee ${CURRENCY}${tradingCost.toFixed(2)})` : ''}`);
   };
 
   try {

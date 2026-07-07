@@ -465,10 +465,15 @@ function fetchUrl(url) {
   });
 }
 
-function parseCSV(csvText) {
+// LSE (.uk) prices are quoted in pence (GBX); divide by 100 so UK stocks
+// sit on the same scale as the USD-quoted US stocks. Without this, a share
+// priced at e.g. 8473p reads as $8,473 against the sim's starting capital
+// and the bots cannot afford it (they round to 0 shares).
+function parseCSV(csvText, isUK) {
   const lines = csvText.trim().split('\n');
   const dates  = [];
   const prices = [];
+  const scale  = isUK ? 100 : 1;
   // stooq returns newest-first; reverse to get oldest-first
   for (let i = lines.length - 1; i >= 1; i--) {
     const parts = lines[i].split(',');
@@ -477,7 +482,7 @@ function parseCSV(csvText) {
       const close = parseFloat(parts[4]);
       if (date && !isNaN(close) && close > 0) {
         dates.push(date);
-        prices.push(+close.toFixed(2));
+        prices.push(+(close / scale).toFixed(2));
       }
     }
   }
@@ -562,7 +567,7 @@ async function main() {
           failed++;
           break; // no point continuing with a bad key
         }
-        const { dates, prices } = parseCSV(csv);
+        const { dates, prices } = parseCSV(csv, stock.stooq.endsWith('.uk'));
         if (prices.length < 2) {
           console.log(`skip (${prices.length} rows)`);
           skipped++;
